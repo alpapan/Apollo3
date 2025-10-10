@@ -394,13 +394,15 @@ const stateModelFactory = (configSchema: ApolloInternetAccountConfigModel) => {
       }
       const debounceTimeout = 300
       const debouncePostUserLocation = (
-        fn: (userLocation: UserLocation[]) => void,
+        fn: (userLocation: UserLocation[]) => Promise<void> | void,
       ) => {
         let timeoutId: ReturnType<typeof setTimeout>
         return (userLocation: UserLocation[]) => {
           clearTimeout(timeoutId)
           timeoutId = setTimeout(() => {
-            fn(userLocation)
+            if (isAlive(self)) {
+              fn(userLocation)
+            }
           }, debounceTimeout)
         }
       }
