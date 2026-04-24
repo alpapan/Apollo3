@@ -20,7 +20,7 @@ import {
 import type { LogLevel } from '@nestjs/common'
 import { HttpAdapterHost, NestFactory } from '@nestjs/core'
 import connectMongoDBSession from 'connect-mongodb-session'
-import { json, urlencoded } from 'express'
+import express, { json, urlencoded } from 'express'
 import session from 'express-session'
 import mongoose from 'mongoose'
 
@@ -94,6 +94,17 @@ async function bootstrap() {
 
   app.use(json({ limit: '50mb' }))
   app.use(urlencoded({ extended: true, limit: '50mb' }))
+
+  // Curatorium extension: serve the bundled jbrowse-plugin-apollo UMD from disk.
+  // The Dockerfile's runtime stage copies the rollup output into /app/plugin/.
+  // Exposed at /plugin/* and reached externally at /apollo/plugin/* once Traefik
+  // strips the /apollo prefix. Registered BEFORE the NestJS router picks up
+  // routes, so the global JwtAuthGuard and ValidationGuard never see these
+  // requests — the plugin bundle is intentionally public.
+  app.use(
+    '/plugin',
+    express.static('/app/plugin', { maxAge: '1d', immutable: true }),
+  )
 
   app.use(
     session({
