@@ -53,6 +53,11 @@ const validationSchema = Joi.object({
   MICROSOFT_CLIENT_SECRET_FILE: Joi.string(),
   JWT_SECRET: Joi.string(),
   JWT_SECRET_FILE: Joi.string(),
+  // Curatorium Phase 1.5 Part A: optional aud/iss enforcement. When set,
+  // JwtStrategy enforces a strict match against these values via passport-jwt.
+  // Backward-compatible: unset means the upstream default (no aud/iss check).
+  JWT_AUDIENCE: Joi.string().optional(),
+  JWT_ISSUER: Joi.string().optional(),
   SESSION_SECRET: Joi.string(),
   SESSION_SECRET_FILE: Joi.string(),
   // Optional

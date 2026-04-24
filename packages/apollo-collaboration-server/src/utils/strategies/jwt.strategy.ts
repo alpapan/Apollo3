@@ -9,6 +9,8 @@ import { ExtractJwt, Strategy } from 'passport-jwt'
 interface JWTSecretConfig {
   JWT_SECRET?: string
   JWT_SECRET_FILE?: string
+  JWT_AUDIENCE?: string
+  JWT_ISSUER?: string
 }
 
 @Injectable()
@@ -22,10 +24,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       const uriFile = configService.get('JWT_SECRET_FILE', { infer: true })!
       jwtSecret = fs.readFileSync(uriFile, 'utf8').trim()
     }
+    const jwtAudience = configService.get('JWT_AUDIENCE', { infer: true })
+    const jwtIssuer = configService.get('JWT_ISSUER', { infer: true })
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: jwtSecret,
+      ...(jwtAudience ? { audience: jwtAudience } : {}),
+      ...(jwtIssuer ? { issuer: jwtIssuer } : {}),
     })
   }
 
