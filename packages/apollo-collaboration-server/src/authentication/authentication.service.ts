@@ -309,11 +309,24 @@ export class AuthenticationService {
         }
       }
     } else {
-      user = await this.usersService.addNew({
-        username: payload.username,
-        email: payload.email,
-        role,
-      })
+      // Race: two concurrent token-exchange calls for a not-yet-created
+      // user both reach this branch. Catch the duplicate-key error from
+      // the loser and refetch — the winner has just created the row.
+      try {
+        user = await this.usersService.addNew({
+          username: payload.username,
+          email: payload.email,
+          role,
+        })
+      } catch (e: unknown) {
+        const code = (e as { code?: number } | null)?.code
+        if (code === 11000) {
+          user = await this.usersService.findByEmail(payload.email)
+          if (!user) throw e
+        } else {
+          throw e
+        }
+      }
       await this.usersService.updateRoleAndTracking(
         user.id as string,
         role,
