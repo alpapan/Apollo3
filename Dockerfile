@@ -45,7 +45,7 @@ COPY --from=build /app/packages/jbrowse-plugin-apollo/dist/jbrowse-plugin-apollo
 # at this file via /apollo/plugin/sequence_ontology.json after Traefik strips
 # /apollo. Pin to the same SHA the plugin's hardcoded fallback uses
 # (jbrowse-plugin-apollo/src/session/session.ts:339) so install matches fallback.
-ADD https://github.com/The-Sequence-Ontology/SO-Ontologies/raw/01c33c6d9b6c8dca12e7d3e37b49ee113093c2fa/Ontology_Files/so.json /app/plugin/sequence_ontology.json
+ADD --chmod=644 https://github.com/The-Sequence-Ontology/SO-Ontologies/raw/01c33c6d9b6c8dca12e7d3e37b49ee113093c2fa/Ontology_Files/so.json /app/plugin/sequence_ontology.json
 RUN yarn workspaces focus --production @apollo-annotation/collaboration-server
 EXPOSE 3999
 CMD ["yarn", "start:prod"]
