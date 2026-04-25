@@ -213,7 +213,12 @@ export class AuthenticationService {
       user = await this.usersService.addNew(newUser)
     }
     this.logger.debug(`User found in Mongo: ${JSON.stringify(user)}`)
-    return this.mintTokenForUser(user)
+    return this.mintTokenForUser({
+      username: user.username,
+      email: user.email,
+      role: user.role as Role,
+      id: user.id as string,
+    })
   }
 
   private mintTokenForUser(
@@ -296,17 +301,31 @@ export class AuthenticationService {
         user.lastId1Kid !== payload.id1_kid ||
         user.lastId1BootId !== payload.id1_boot_id
       if (shouldResync) {
-        await this.usersService.updateRoleAndTracking(
+        const updated = await this.usersService.updateRoleAndTracking(
           user.id,
           role,
           payload.id1_kid,
           payload.id1_boot_id,
         )
-        user = { ...user, role }
+        if (updated) {
+          user = updated
+        }
       }
     }
 
+    if (!user) {
+      throw new UnauthorizedException('Failed to resolve user for exchange')
+    }
+
     const expSeconds = Math.max(1, payload.exp - Math.floor(Date.now() / 1000))
-    return this.mintTokenForUser(user, { expSeconds })
+    return this.mintTokenForUser(
+      {
+        username: user.username,
+        email: user.email,
+        role: user.role as Role,
+        id: user.id as string,
+      },
+      { expSeconds },
+    )
   }
 }
