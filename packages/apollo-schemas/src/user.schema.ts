@@ -15,6 +15,12 @@ export class User {
 
   @Prop({ type: String, enum: ['readOnly', 'admin', 'user', 'none'] })
   role: Role
+
+  @Prop()
+  lastId1Kid?: string
+
+  @Prop()
+  lastId1BootId?: string
 }
 
 export const UserSchema = SchemaFactory.createForClass(User)

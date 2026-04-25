@@ -53,6 +53,11 @@ const validationSchema = Joi.object({
   MICROSOFT_CLIENT_SECRET_FILE: Joi.string(),
   JWT_SECRET: Joi.string(),
   JWT_SECRET_FILE: Joi.string(),
+  // HS256 secret used to verify the inner JWT presented at /auth/exchange
+  // (curatorium-backend signs with this; Apollo verifies). Required so
+  // Apollo cannot start in a state where the exchange path silently
+  // accepts unsigned tokens.
+  CURATORIUM_EXCHANGE_SECRET: Joi.string().min(32).required(),
   // Curatorium Phase 1.5 Part A: optional aud/iss enforcement. When set,
   // JwtStrategy enforces a strict match against these values via passport-jwt.
   // Backward-compatible: unset means the upstream default (no aud/iss check).

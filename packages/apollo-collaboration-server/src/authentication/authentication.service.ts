@@ -36,6 +36,27 @@ interface ConfigValues {
   ALLOW_GUEST_USER: boolean
   DEFAULT_NEW_USER_ROLE: Role
   ROOT_USER_PASSWORD: string
+  CURATORIUM_EXCHANGE_SECRET: string
+}
+
+const ALLOWED_EXCHANGE_ROLES: ReadonlySet<Role> = new Set([
+  Role.Admin,
+  Role.User,
+  Role.ReadOnly,
+])
+const REPLAY_TTL_MS = 120_000
+const REPLAY_CAPACITY = 1000
+const CLOCK_TOLERANCE_SECONDS = 5
+
+interface InnerJwtPayload {
+  username: string
+  email: string
+  role: string
+  id1_kid: string
+  id1_boot_id: string
+  jti: string
+  iat: number
+  exp: number
 }
 
 const ROOT_USER_NAME = 'root'
@@ -192,16 +213,100 @@ export class AuthenticationService {
       user = await this.usersService.addNew(newUser)
     }
     this.logger.debug(`User found in Mongo: ${JSON.stringify(user)}`)
+    return this.mintTokenForUser(user)
+  }
 
+  private mintTokenForUser(
+    user: { username: string; email: string; role: Role; id: string },
+    opts?: { expSeconds?: number },
+  ) {
     const payload: JWTPayload = {
       username: user.username,
       email: user.email,
       role: user.role,
       id: user.id,
     }
-    // Return token with SUCCESS status
-    const returnToken = this.jwtService.sign(payload)
+    const signOptions =
+      opts?.expSeconds != null ? { expiresIn: opts.expSeconds } : {}
+    const returnToken = this.jwtService.sign(payload, signOptions)
     this.logger.debug(`User "${user.username}" has logged in`)
     return { token: returnToken }
+  }
+
+  private readonly seenJtis = new Map<string, number>()
+
+  /**
+   * Exchange a curatorium-backend-signed HS256 JWT for an Apollo-minted
+   * HS256 JWT. The inner JWT carries ORCID, role, and id1 tracking claims;
+   * we honour the role verbatim (no first-user-becomes-admin fallback —
+   * the role is set by curatorium-backend's CURATORIUM_APOLLO_ADMIN_ORCIDS
+   * allowlist).
+   */
+  async exchangeCuratoriumToken(innerJwt: string) {
+    const secret = this.configService.get('CURATORIUM_EXCHANGE_SECRET', {
+      infer: true,
+    })
+    let payload: InnerJwtPayload
+    try {
+      payload = this.jwtService.verify<InnerJwtPayload>(innerJwt, {
+        secret,
+        algorithms: ['HS256'],
+        clockTolerance: CLOCK_TOLERANCE_SECONDS,
+      })
+    } catch {
+      throw new UnauthorizedException('Invalid exchange token')
+    }
+
+    // Replay defence: TTL purge, then size-cap (FIFO), then check + record.
+    const now = Date.now()
+    for (const [jti, storedAt] of this.seenJtis) {
+      if (now - storedAt <= REPLAY_TTL_MS) break
+      this.seenJtis.delete(jti)
+    }
+    if (this.seenJtis.has(payload.jti)) {
+      throw new UnauthorizedException('Token replay')
+    }
+    while (this.seenJtis.size >= REPLAY_CAPACITY) {
+      const oldest = this.seenJtis.keys().next().value
+      if (oldest === undefined) break
+      this.seenJtis.delete(oldest)
+    }
+    this.seenJtis.set(payload.jti, now)
+
+    if (!ALLOWED_EXCHANGE_ROLES.has(payload.role as Role)) {
+      throw new UnauthorizedException(`Unknown role: ${payload.role}`)
+    }
+    const role = payload.role as Role
+
+    let user = await this.usersService.findByEmail(payload.email)
+    if (!user) {
+      user = await this.usersService.addNew({
+        username: payload.username,
+        email: payload.email,
+        role,
+      })
+      await this.usersService.updateRoleAndTracking(
+        user.id,
+        role,
+        payload.id1_kid,
+        payload.id1_boot_id,
+      )
+    } else {
+      const shouldResync =
+        user.lastId1Kid !== payload.id1_kid ||
+        user.lastId1BootId !== payload.id1_boot_id
+      if (shouldResync) {
+        await this.usersService.updateRoleAndTracking(
+          user.id,
+          role,
+          payload.id1_kid,
+          payload.id1_boot_id,
+        )
+        user = { ...user, role }
+      }
+    }
+
+    const expSeconds = Math.max(1, payload.exp - Math.floor(Date.now() / 1000))
+    return this.mintTokenForUser(user, { expSeconds })
   }
 }
