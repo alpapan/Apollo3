@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM localhost:5000/node:24 AS setup
+FROM localhost:5000/node:24.14 AS setup
 WORKDIR /app
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn/ .yarn/
@@ -8,7 +8,7 @@ COPY packages/ packages/
 RUN find packages/ -type f \! \( -name "package.json" -o -name "yarn.lock" \) -delete && \
 find . -type d -empty -delete
 
-FROM localhost:5000/node:24 AS build
+FROM localhost:5000/node:24.14 AS build
 WORKDIR /app
 COPY --from=setup /app .
 RUN yarn install --immutable
@@ -23,7 +23,7 @@ RUN JB_UMD=true yarn build
 WORKDIR /app/packages/apollo-collaboration-server
 RUN yarn build
 
-FROM localhost:5000/node:24
+FROM localhost:5000/node:24.14
 LABEL org.opencontainers.image.source=https://github.com/alpapan/Apollo3
 LABEL org.opencontainers.image.description="Curatorium-extended Apollo collaboration server (bundles the JBrowse Apollo plugin UMD and serves it from /plugin)"
 WORKDIR /app
