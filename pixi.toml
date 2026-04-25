@@ -1,0 +1,36 @@
+[workspace]
+name = "curatorium-apollo"
+version = "0.0.1"
+description = "Apollo3 collaboration server (Curatorium fork) — pixi tasks for lint/test/build"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+# Node 24.14 is provided by the host's nvm (see .nvmrc + ~/software/curatorium/CLAUDE.md
+# Apollo notes). Pixi tasks source nvm so they pick up the .nvmrc-pinned version
+# rather than whatever conda happens to ship.
+[dependencies]
+python = "3.14.*"
+
+[tasks]
+# `pixi run -m apps/backend/containers/apollo/pixi.toml lint`
+# Runs Apollo monorepo eslint (root package.json's `lint` script: yarn eslint).
+lint = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && yarn lint'"
+
+# `pixi run -m apps/backend/containers/apollo/pixi.toml test`
+# Scoped to the auth/users specs that the Curatorium fork actively maintains.
+# The full apollo-collaboration-server suite has ~20 upstream NestJS scaffolds
+# with unwired DI providers (pre-existing); upstream Apollo CI also runs only a
+# 3/27-suite subset. Use `test-all` if you want the full picture.
+test = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && cd packages/apollo-collaboration-server && yarn node --experimental-vm-modules $(yarn bin jest) src/authentication/ src/users/'"
+
+# `pixi run -m apps/backend/containers/apollo/pixi.toml test-all`
+# Full ACS jest suite — many upstream scaffolds are red.
+test-all = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && cd packages/apollo-collaboration-server && yarn node --experimental-vm-modules $(yarn bin jest)'"
+
+# `pixi run -m apps/backend/containers/apollo/pixi.toml build`
+# Reproduces the failing Dockerfile step locally — useful for surfacing tsc/nest
+# errors without rebuilding the container image.
+build = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && cd packages/apollo-collaboration-server && yarn build'"
+
+# Convenience for installing the Yarn PnP cache after pulling new commits.
+install = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && yarn install --immutable'"
