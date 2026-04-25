@@ -1,9 +1,10 @@
+import { randomUUID } from 'node:crypto'
+
 import { jest } from '@jest/globals'
 import { UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import { Test, type TestingModule } from '@nestjs/testing'
-import { randomUUID } from 'node:crypto'
 import jwt from 'jsonwebtoken'
 
 import { UsersService } from '../users/users.service.js'
@@ -61,9 +62,13 @@ describe('AuthenticationService', () => {
     }
     configService = {
       get: jest.fn((key: string) => {
-        if (key === 'CURATORIUM_EXCHANGE_SECRET') return TEST_EXCHANGE_SECRET
-        if (key === 'DEFAULT_NEW_USER_ROLE') return Role.User
-        return undefined
+        if (key === 'CURATORIUM_EXCHANGE_SECRET') {
+          return TEST_EXCHANGE_SECRET
+        }
+        if (key === 'DEFAULT_NEW_USER_ROLE') {
+          return Role.User
+        }
+        return
       }),
     }
 

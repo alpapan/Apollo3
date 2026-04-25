@@ -40,9 +40,15 @@ function runStrategy(
     headers: { authorization: `Bearer ${token}` },
   } as any
   return new Promise((resolve) => {
-    ;(strategy as any).success = (user: unknown) => resolve({ user })
-    ;(strategy as any).fail = (info: unknown) => resolve({ fail: info })
-    ;(strategy as any).error = (err: unknown) => resolve({ error: err })
+    ;(strategy as any).success = (user: unknown) => {
+      resolve({ user })
+    }
+    ;(strategy as any).fail = (info: unknown) => {
+      resolve({ fail: info })
+    }
+    ;(strategy as any).error = (err: unknown) => {
+      resolve({ error: err })
+    }
     ;(strategy as any).authenticate(req)
   })
 }

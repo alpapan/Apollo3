@@ -232,7 +232,7 @@ export class AuthenticationService {
       id: user.id,
     }
     const signOptions =
-      opts?.expSeconds != null ? { expiresIn: opts.expSeconds } : {}
+      opts?.expSeconds == null ? {} : { expiresIn: opts.expSeconds }
     const returnToken = this.jwtService.sign(payload, signOptions)
     this.logger.debug(`User "${user.username}" has logged in`)
     return { token: returnToken }
@@ -267,15 +267,22 @@ export class AuthenticationService {
     // oldest entry first, so we can break on the first non-expired entry.
     const now = Date.now()
     for (const [jti, storedAt] of this.seenJtis) {
-      if (now - storedAt <= REPLAY_TTL_MS) break
+      if (now - storedAt <= REPLAY_TTL_MS) {
+        break
+      }
       this.seenJtis.delete(jti)
     }
     if (this.seenJtis.has(payload.jti)) {
       throw new UnauthorizedException('Token replay')
     }
     while (this.seenJtis.size >= REPLAY_CAPACITY) {
-      const oldest = this.seenJtis.keys().next().value
-      if (oldest === undefined) break
+      // Narrow Map.keys().next().value (typed as `any` under tseslint's
+      // strict-type-checked) to string | undefined so the delete below
+      // doesn't trip `no-unsafe-argument`.
+      const oldest: string | undefined = this.seenJtis.keys().next().value
+      if (oldest === undefined) {
+        break
+      }
       this.seenJtis.delete(oldest)
     }
     this.seenJtis.set(payload.jti, now)
@@ -286,25 +293,13 @@ export class AuthenticationService {
     const role = payload.role as Role
 
     let user = await this.usersService.findByEmail(payload.email)
-    if (!user) {
-      user = await this.usersService.addNew({
-        username: payload.username,
-        email: payload.email,
-        role,
-      })
-      await this.usersService.updateRoleAndTracking(
-        user.id,
-        role,
-        payload.id1_kid,
-        payload.id1_boot_id,
-      )
-    } else {
+    if (user) {
       const shouldResync =
         user.lastId1Kid !== payload.id1_kid ||
         user.lastId1BootId !== payload.id1_boot_id
       if (shouldResync) {
         const updated = await this.usersService.updateRoleAndTracking(
-          user.id,
+          user.id as string,
           role,
           payload.id1_kid,
           payload.id1_boot_id,
@@ -313,6 +308,18 @@ export class AuthenticationService {
           user = updated
         }
       }
+    } else {
+      user = await this.usersService.addNew({
+        username: payload.username,
+        email: payload.email,
+        role,
+      })
+      await this.usersService.updateRoleAndTracking(
+        user.id as string,
+        role,
+        payload.id1_kid,
+        payload.id1_boot_id,
+      )
     }
 
     if (!user) {
