@@ -263,6 +263,8 @@ export class AuthenticationService {
     }
 
     // Replay defence: TTL purge, then size-cap (FIFO), then check + record.
+    // Relies on `Map` insertion-order iteration (ES6 guarantee) for FIFO:
+    // oldest entry first, so we can break on the first non-expired entry.
     const now = Date.now()
     for (const [jti, storedAt] of this.seenJtis) {
       if (now - storedAt <= REPLAY_TTL_MS) break
