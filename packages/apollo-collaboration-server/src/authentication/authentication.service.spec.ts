@@ -143,6 +143,29 @@ describe('AuthenticationService', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException)
   })
 
+  it('exchangeCuratoriumToken_rejectsTamperedPayload', async () => {
+    // Mint a valid HS256 token with role: 'user'
+    const claims = buildInnerClaims({ role: 'user' })
+    const validToken = signInnerJwt(claims)
+
+    // Split, tamper the payload's role claim to 'admin', keep original signature
+    const [headerB64, payloadB64, sigB64] = validToken.split('.')
+    const payload = JSON.parse(
+      Buffer.from(payloadB64, 'base64url').toString('utf8'),
+    )
+    payload.role = 'admin'
+    const tamperedPayloadB64 = Buffer.from(JSON.stringify(payload))
+      .toString('base64url')
+      .replace(/=+$/, '')
+    const tamperedToken = `${headerB64}.${tamperedPayloadB64}.${sigB64}`
+
+    // Apollo MUST reject — HMAC over the tampered payload won't match the
+    // original signature.
+    await expect(
+      service.exchangeCuratoriumToken(tamperedToken),
+    ).rejects.toBeInstanceOf(UnauthorizedException)
+  })
+
   it('exchangeCuratoriumToken_rejectsReplayWithinWindow', async () => {
     usersService.findByEmail.mockResolvedValue(null)
     usersService.addNew.mockResolvedValue({
