@@ -25,7 +25,7 @@ import { RefSeqsService } from './refSeqs.service.js'
       },
       {
         name: Assembly.name,
-        schema: AssemblySchema,
+        useFactory: () => AssemblySchema,
       },
     ]),
   ],
