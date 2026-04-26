@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { RefSeq, RefSeqSchema } from '@apollo-annotation/schemas'
+import {
+  Assembly,
+  AssemblySchema,
+  RefSeq,
+  RefSeqSchema,
+} from '@apollo-annotation/schemas'
 import { Module } from '@nestjs/common'
 import { MongooseModule, getConnectionToken } from '@nestjs/mongoose'
 import idValidator from 'mongoose-id-validator'
@@ -17,6 +22,10 @@ import { RefSeqsService } from './refSeqs.service.js'
           return RefSeqSchema
         },
         inject: [getConnectionToken()],
+      },
+      {
+        name: Assembly.name,
+        schema: AssemblySchema,
       },
     ]),
   ],

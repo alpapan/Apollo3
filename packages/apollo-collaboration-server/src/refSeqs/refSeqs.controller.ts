@@ -14,7 +14,7 @@ export class RefSeqsController {
   private readonly logger = new Logger(RefSeqsController.name)
 
   @Get()
-  findAll(@Query() request: FindRefSeqDto) {
+  async findAll(@Query() request: FindRefSeqDto) {
     return this.refSeqsService.findAll(request)
   }
 
