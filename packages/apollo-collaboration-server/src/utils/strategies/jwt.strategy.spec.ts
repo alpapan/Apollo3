@@ -30,7 +30,7 @@ function makeConfigService(overrides: Record<string, string | undefined> = {}) {
 
 /**
  * Drive passport-jwt Strategy end-to-end against a synthetic request.
- * Returns success (user) / fail (info) / error (err) — only one fires.
+ * Returns success (user) / fail (info) / error (err) - only one fires.
  */
 function runStrategy(
   strategy: JwtStrategy,
@@ -54,7 +54,7 @@ function runStrategy(
 }
 
 describe('JwtStrategy aud/iss enforcement (Phase 1.5 Part A)', () => {
-  describe('regression guard — must pass BEFORE and AFTER the hardening', () => {
+  describe('regression guard - must pass BEFORE and AFTER the hardening', () => {
     it('accepts token with matching aud + iss', async () => {
       const strategy = new JwtStrategy(makeConfigService())
       const token = jwt.sign(
@@ -68,7 +68,7 @@ describe('JwtStrategy aud/iss enforcement (Phase 1.5 Part A)', () => {
     })
   })
 
-  describe('hardening — RED now, GREEN after JWT_AUDIENCE/JWT_ISSUER wired', () => {
+  describe('hardening - RED now, GREEN after JWT_AUDIENCE/JWT_ISSUER wired', () => {
     it('rejects token with wrong aud', async () => {
       const strategy = new JwtStrategy(makeConfigService())
       const token = jwt.sign(
@@ -118,7 +118,7 @@ describe('JwtStrategy aud/iss enforcement (Phase 1.5 Part A)', () => {
     })
   })
 
-  describe('backward compatibility — JWT_AUDIENCE/JWT_ISSUER unset (upstream default)', () => {
+  describe('backward compatibility - JWT_AUDIENCE/JWT_ISSUER unset (upstream default)', () => {
     it('accepts token with no aud claim when JWT_AUDIENCE is unset', async () => {
       const strategy = new JwtStrategy(
         makeConfigService({ JWT_AUDIENCE: undefined, JWT_ISSUER: undefined }),

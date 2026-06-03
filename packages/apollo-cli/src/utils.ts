@@ -39,7 +39,7 @@ export async function createFetchErrorMessage(
   const responseMessage = `${response.status} ${response.statusText}${
     errorMessage ? ` (${errorMessage})` : ''
   }`
-  return `${additionalText ? `${additionalText} — ` : ''}${responseMessage}`
+  return `${additionalText ? `${additionalText} - ` : ''}${responseMessage}`
 }
 
 export function checkConfigfileExists(configFile: string) {

@@ -243,7 +243,7 @@ export class AuthenticationService {
   /**
    * Exchange a curatorium-backend-signed HS256 JWT for an Apollo-minted
    * HS256 JWT. The inner JWT carries ORCID, role, and id1 tracking claims;
-   * we honour the role verbatim (no first-user-becomes-admin fallback —
+   * we honour the role verbatim (no first-user-becomes-admin fallback -
    * the role is set by curatorium-backend's CURATORIUM_APOLLO_ADMIN_ORCIDS
    * allowlist).
    */
@@ -311,7 +311,7 @@ export class AuthenticationService {
     } else {
       // Race: two concurrent token-exchange calls for a not-yet-created
       // user both reach this branch. Catch the duplicate-key error from
-      // the loser and refetch — the winner has just created the row.
+      // the loser and refetch - the winner has just created the row.
       try {
         user = await this.usersService.addNew({
           username: payload.username,

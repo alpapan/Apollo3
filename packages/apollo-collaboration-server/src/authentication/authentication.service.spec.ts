@@ -117,7 +117,7 @@ describe('AuthenticationService', () => {
     expect(decoded.email).toBe(claims.email)
     expect(decoded.role).toBe('user')
     expect(decoded.id).toBe('mongo-id-1')
-    // No iss=curatorium-backend — Apollo mints, not curatorium
+    // No iss=curatorium-backend - Apollo mints, not curatorium
     expect((decoded as { iss?: string }).iss).not.toBe('curatorium-backend')
   })
 
@@ -159,7 +159,7 @@ describe('AuthenticationService', () => {
       .replace(/=+$/, '')
     const tamperedToken = `${headerB64}.${tamperedPayloadB64}.${sigB64}`
 
-    // Apollo MUST reject — HMAC over the tampered payload won't match the
+    // Apollo MUST reject - HMAC over the tampered payload won't match the
     // original signature.
     await expect(
       service.exchangeCuratoriumToken(tamperedToken),
@@ -318,7 +318,7 @@ describe('AuthenticationService', () => {
   })
 
   it('exchangeCuratoriumToken_doesNotApplyFirstUserAdminFallback', async () => {
-    // Empty users collection — what would normally trigger logIn's
+    // Empty users collection - what would normally trigger logIn's
     // first-user-becomes-admin fallback
     usersService.findAll.mockResolvedValue([])
     usersService.findByEmail.mockResolvedValue(null)

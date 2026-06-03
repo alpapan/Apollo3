@@ -1,7 +1,7 @@
 [workspace]
 name = "curatorium-apollo"
 version = "0.0.1"
-description = "Apollo3 collaboration server (Curatorium fork) — pixi tasks for lint/test/build"
+description = "Apollo3 collaboration server (Curatorium fork) - pixi tasks for lint/test/build"
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 
@@ -24,11 +24,11 @@ lint = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/nu
 test = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && cd packages/apollo-collaboration-server && yarn node --experimental-vm-modules $(yarn bin jest) src/authentication/ src/users/'"
 
 # `pixi run -m apps/backend/containers/apollo/pixi.toml test-all`
-# Full ACS jest suite — many upstream scaffolds are red.
+# Full ACS jest suite - many upstream scaffolds are red.
 test-all = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && cd packages/apollo-collaboration-server && yarn node --experimental-vm-modules $(yarn bin jest)'"
 
 # `pixi run -m apps/backend/containers/apollo/pixi.toml build`
-# Reproduces the failing Dockerfile step locally — useful for surfacing tsc/nest
+# Reproduces the failing Dockerfile step locally - useful for surfacing tsc/nest
 # errors without rebuilding the container image.
 build = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && cd packages/apollo-collaboration-server && yarn build'"
 

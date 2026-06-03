@@ -1,6 +1,6 @@
 import { UserSchema } from '@apollo-annotation/schemas'
 
-describe('User schema — Curatorium id1 tracking fields', () => {
+describe('User schema - Curatorium id1 tracking fields', () => {
   it('declares lastId1Kid as an optional String path', () => {
     const path = UserSchema.path('lastId1Kid')
     expect(path).toBeDefined()

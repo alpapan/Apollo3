@@ -35,7 +35,7 @@ COPY --from=build /app/packages/apollo-schemas/dist /app/packages/apollo-schemas
 COPY --from=build /app/packages/apollo-shared/dist /app/packages/apollo-shared/dist
 # Curatorium extension: bundle the built plugin UMD so main.ts can serve
 # it via express.static at /plugin/*. Same version pinning as the server
-# image — both are produced from the same monorepo commit.
+# image - both are produced from the same monorepo commit.
 COPY --from=build /app/packages/jbrowse-plugin-apollo/dist/jbrowse-plugin-apollo.umd.production.min.js /app/plugin/jbrowse-plugin-apollo.umd.production.min.js
 # Apollo install convention (per packages/website/docs/02-installation/02-examples/
 # 01-docker-compose.md:175-176): the Sequence Ontology JSON is fetched at image

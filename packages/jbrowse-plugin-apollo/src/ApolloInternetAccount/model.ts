@@ -294,7 +294,7 @@ const stateModelFactory = (configSchema: ApolloInternetAccountConfigModel) => {
         }
         if (!response.ok) {
           console.error(
-            `Error when fetching the last updates to recover socket connection — ${response.status}`,
+            `Error when fetching the last updates to recover socket connection - ${response.status}`,
           )
           return
         }

@@ -129,5 +129,5 @@ packages/apollo-collaboration-server/test/uploaded
 # Python
 __pycache__/
 
-# Audit trail written by bin/pre-commit-hook.sh — committed by design.
+# Audit trail written by bin/pre-commit-hook.sh - committed by design.
 !.audit/*.log

@@ -100,7 +100,7 @@ async function bootstrap() {
   // Exposed at /plugin/* and reached externally at /apollo/plugin/* once Traefik
   // strips the /apollo prefix. Registered BEFORE the NestJS router picks up
   // routes, so the global JwtAuthGuard and ValidationGuard never see these
-  // requests — the plugin bundle is intentionally public.
+  // requests - the plugin bundle is intentionally public.
   app.use(
     '/plugin',
     express.static('/app/plugin', { maxAge: '1d', immutable: true }),

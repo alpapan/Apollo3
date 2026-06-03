@@ -28,8 +28,8 @@ const FeatureList: FeatureItem[] = [
     Svg: ApolloLogo,
     description: (
       <>
-        Inspired by previous genome annotation editors — such as Web Apollo,
-        Artemis, and Otter — using updated technologies.
+        Inspired by previous genome annotation editors - such as Web Apollo,
+        Artemis, and Otter - using updated technologies.
       </>
     ),
   },
