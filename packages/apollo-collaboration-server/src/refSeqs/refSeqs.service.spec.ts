@@ -1,7 +1,7 @@
 import {
   Assembly,
-  RefSeq,
   type AssemblyDocument,
+  RefSeq,
   type RefSeqDocument,
 } from '@apollo-annotation/schemas'
 import { jest } from '@jest/globals'

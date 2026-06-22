@@ -12,25 +12,26 @@ platforms = ["linux-64"]
 python = "3.14.*"
 
 [tasks]
-# `pixi run -m apps/backend/containers/apollo/pixi.toml lint`
+# `pixi run -m apps/apollo/pixi.toml lint`
 # Runs Apollo monorepo eslint (root package.json's `lint` script: yarn eslint).
 lint = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && yarn lint'"
 
-# `pixi run -m apps/backend/containers/apollo/pixi.toml test`
+# `pixi run -m apps/apollo/pixi.toml test`
 # Scoped to the auth/users specs that the Curatorium fork actively maintains.
 # The full apollo-collaboration-server suite has ~20 upstream NestJS scaffolds
 # with unwired DI providers (pre-existing); upstream Apollo CI also runs only a
 # 3/27-suite subset. Use `test-all` if you want the full picture.
 test = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && cd packages/apollo-collaboration-server && yarn node --experimental-vm-modules $(yarn bin jest) src/authentication/ src/users/'"
 
-# `pixi run -m apps/backend/containers/apollo/pixi.toml test-all`
+# `pixi run -m apps/apollo/pixi.toml test-all`
 # Full ACS jest suite - many upstream scaffolds are red.
 test-all = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && cd packages/apollo-collaboration-server && yarn node --experimental-vm-modules $(yarn bin jest)'"
 
-# `pixi run -m apps/backend/containers/apollo/pixi.toml build`
-# Reproduces the failing Dockerfile step locally - useful for surfacing tsc/nest
-# errors without rebuilding the container image.
-build = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && cd packages/apollo-collaboration-server && yarn build'"
+# `pixi run -m apps/apollo/pixi.toml build`
+# Canonical host build (mirrors Dockerfile): builds the JBrowse UMD plugin, then the
+# NestJS collaboration-server - producing the packages/*/dist that the host test + lint
+# (and the pre-commit hook) need. Run once after a fresh clone / `pixi run install`.
+build = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && (cd packages/jbrowse-plugin-apollo && JB_UMD=true yarn build) && (cd packages/apollo-collaboration-server && yarn build)'"
 
 # Convenience for installing the Yarn PnP cache after pulling new commits.
 install = "bash -c 'export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 && nvm use >/dev/null 2>&1 && yarn install --immutable'"

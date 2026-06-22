@@ -1,7 +1,7 @@
 import {
   Assembly,
-  RefSeq,
   type AssemblyDocument,
+  RefSeq,
   type RefSeqDocument,
 } from '@apollo-annotation/schemas'
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
@@ -29,7 +29,6 @@ export class RefSeqsService {
 
   async findAll(filter?: FindRefSeqDto) {
     if (!filter?.assembly) {
-      // eslint-disable-next-line unicorn/no-array-callback-reference
       return this.refSeqModel.find({}).exec()
     }
 
@@ -49,7 +48,6 @@ export class RefSeqsService {
       assemblyId = assembly._id.toString()
     }
 
-    // eslint-disable-next-line unicorn/no-array-callback-reference
     return this.refSeqModel.find({ ...filter, assembly: assemblyId }).exec()
   }
 

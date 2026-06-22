@@ -318,13 +318,15 @@ export class AuthenticationService {
           email: payload.email,
           role,
         })
-      } catch (e: unknown) {
-        const code = (e as { code?: number } | null)?.code
-        if (code === 11000) {
+      } catch (error: unknown) {
+        const code = (error as { code?: number } | null)?.code
+        if (code === 11_000) {
           user = await this.usersService.findByEmail(payload.email)
-          if (!user) throw e
+          if (!user) {
+            throw error
+          }
         } else {
-          throw e
+          throw error
         }
       }
       await this.usersService.updateRoleAndTracking(
