@@ -40,7 +40,10 @@ export default [
       globals: { ...globals.browser, ...globals.node },
       parserOptions: { projectService: true },
     },
-    settings: { react: { version: 'detect' } },
+    // Pinned to the react version every package declares (^18.2.0); 'detect' warns
+    // under Yarn PnP because react is not resolvable at the config root. Bump on a
+    // React major upgrade.
+    settings: { react: { version: '18.2' } },
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     plugins: { tsdoc: pluginTSDoc, import: pluginImport },
     rules: {
