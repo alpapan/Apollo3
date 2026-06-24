@@ -1,9 +1,4 @@
-import {
-  Assembly,
-  type AssemblyDocument,
-  RefSeq,
-  type RefSeqDocument,
-} from '@apollo-annotation/schemas'
+import { Assembly, RefSeq } from '@apollo-annotation/schemas'
 import { jest } from '@jest/globals'
 import { NotFoundException } from '@nestjs/common'
 import { getModelToken } from '@nestjs/mongoose'
@@ -14,12 +9,22 @@ import { RefSeqsService } from './refSeqs.service.js'
 
 describe('RefSeqsService', () => {
   let service: RefSeqsService
-  let mockRefSeqModel: any
-  let mockAssemblyModel: any
+  let mockRefSeqModel: {
+    find: jest.Mock
+    create: jest.Mock
+    findById: jest.Mock
+    findByIdAndUpdate: jest.Mock
+    findByIdAndDelete: jest.Mock
+  }
+  let mockAssemblyModel: { findOne: jest.Mock }
 
   beforeEach(async () => {
     mockRefSeqModel = {
       find: jest.fn(),
+      create: jest.fn(),
+      findById: jest.fn(),
+      findByIdAndUpdate: jest.fn(),
+      findByIdAndDelete: jest.fn(),
     }
     mockAssemblyModel = {
       findOne: jest.fn(),
@@ -109,6 +114,20 @@ describe('RefSeqsService', () => {
       })
 
       const result = await service.findAll({})
+
+      expect(mockAssemblyModel.findOne).not.toHaveBeenCalled()
+      expect(mockRefSeqModel.find).toHaveBeenCalledWith({})
+      expect(result).toEqual(mockRefSeqs)
+    })
+
+    it('should query without filter when called with no arguments', async () => {
+      const mockRefSeqs = [{ _id: 'ref1' }]
+
+      mockRefSeqModel.find.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockRefSeqs),
+      })
+
+      const result = await service.findAll()
 
       expect(mockAssemblyModel.findOne).not.toHaveBeenCalled()
       expect(mockRefSeqModel.find).toHaveBeenCalledWith({})

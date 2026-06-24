@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "lint": "cross-env NODE_OPTIONS='--max-old-space-size=4096' yarn eslint --max-warnings 0",
+    "lint": "cross-env NODE_OPTIONS='--max-old-space-size=4096' yarn eslint packages scripts --max-warnings 0",
     "build:shared": "yarn workspace @apollo-annotation/shared run build",
     "release": "tsx scripts/makeGitTag.ts",
     "start:shared": "yarn workspace @apollo-annotation/shared run start",

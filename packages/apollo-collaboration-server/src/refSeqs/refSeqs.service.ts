@@ -48,7 +48,8 @@ export class RefSeqsService {
       assemblyId = assembly._id.toString()
     }
 
-    return this.refSeqModel.find({ ...filter, assembly: assemblyId }).exec()
+    // FindRefSeqDto has only { assembly }, which we already override; spreading would trigger no-misused-spread
+    return this.refSeqModel.find({ assembly: assemblyId }).exec()
   }
 
   async findOne(id: string) {
