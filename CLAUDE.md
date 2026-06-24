@@ -73,13 +73,6 @@ pixi run -m apps/apollo/pixi.toml lint       # eslint --max-warnings 0 over the 
 - Returns **403** (not 401) on a bad token.
 - Env vars are `CURATORIUM_APOLLO_*` (not bare `APOLLO_*`).
 
-## Image build is agent-banned
-
-`ENV=test pixi run curatorium admin build apollo --rebuild --drop` **crashes
-Claude** - the agent must NOT run it (directly or via skaffold/docker). When the
-apollo image needs rebuilding, surface it and ask the user to run it from a
-terminal.
-
 ## Commit submodule changes from here
 
 `cd apps/apollo && git add <file> && git commit -m "feat(apollo): …"` on the
