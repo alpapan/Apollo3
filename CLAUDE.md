@@ -41,11 +41,13 @@ The canonical host build (mirrors `Dockerfile`) is the pixi `build` task:
 pixi run -m apps/apollo/pixi.toml build
 ```
 
-which runs (conda node 24.14, Berry via `corepack yarn`):
+which runs (conda node 24.14, Berry invoked directly via
+`node .yarn/releases/yarn-4.14.1.cjs` - NOT via corepack; see
+`docs/apollo-pixi-build-corepack-pnp.md`):
 
 ```bash
-( cd packages/jbrowse-plugin-apollo     && JB_UMD=true corepack yarn build )   # @apollo-annotation/shared + tsc project-ref deps + JBrowse UMD plugin
-( cd packages/apollo-collaboration-server && corepack yarn build )             # build:shared + nest build (schemas/common/mst/shared dists + server)
+( cd packages/jbrowse-plugin-apollo     && JB_UMD=true node "$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs" build )   # @apollo-annotation/shared + tsc project-ref deps + JBrowse UMD plugin
+( cd packages/apollo-collaboration-server && node "$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs" build )             # build:shared + nest build (schemas/common/mst/shared dists + server)
 ```
 
 Run this once after a fresh clone / `pixi run install` before any host test,
@@ -60,16 +62,17 @@ pixi run -m apps/apollo/pixi.toml lint       # eslint --max-warnings 0 over the 
 ```
 
 - **Use the pixi `test` task, not bare jest.** It invokes
-  `corepack yarn node --experimental-vm-modules $(corepack yarn bin jest)`; a
-  bare `NODE_OPTIONS=... jest` breaks the Yarn-PnP wrapper.
+  `node .yarn/releases/yarn-4.14.1.cjs node --experimental-vm-modules $(node .yarn/releases/yarn-4.14.1.cjs bin jest)`;
+  a bare `NODE_OPTIONS=... jest` breaks the Yarn-PnP wrapper.
 - **Build first.** Both `test` and `lint` need `packages/*/dist`; without a
   build they fail with `Cannot find module .../apollo-schemas/dist/index.js`.
 - Node is pinned to **24.14** via this env's `pixi.toml` conda dependency
   (`nodejs = ">=24.14,<24.15"`), not nvm: 24.15+ broke `jest-resolve` and
-  ESLint's config-loader under Yarn PnP + ESM. The pixi tasks run Berry through
-  `corepack yarn` (local `.yarnrc.yml` yarnPath gives 4.14.1), so they need no
-  host nvm or global yarn and never silently fall back to a wrong node. `.nvmrc`
-  (24.14) remains for host devs who prefer nvm.
+  ESLint's config-loader under Yarn PnP + ESM. The pixi tasks invoke Berry
+  directly via `node "$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs"` (NOT
+  via corepack - corepack's `runVersion()` fails under Yarn PnP; see
+  `docs/apollo-pixi-build-corepack-pnp.md`). `.nvmrc` (24.14) remains for host
+  devs who prefer nvm.
 
 ## Curatorium-specific auth
 

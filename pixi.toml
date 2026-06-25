@@ -8,9 +8,10 @@ platforms = ["linux-64"]
 # Node is pinned to 24.14 as a conda dependency below so the apollo toolchain is
 # deterministic. Node 24.15+ changed CJS-loaded-via-ESM-translator behaviour, which
 # breaks ESLint's config-loader (require.cache) and jest-resolve (require.resolve.paths)
-# under Yarn PnP + ESM. Tasks invoke Berry through `corepack yarn` (bundled with the
-# conda node); the local .yarnrc.yml yarnPath provides yarn 4.14.1, so no nvm or global
-# yarn is needed and there is no silent fallback to a wrong node.
+# under Yarn PnP + ESM. Tasks invoke Berry directly via `node .yarn/releases/yarn-4.14.1.cjs`
+# (NOT via corepack) - corepack's runVersion() calls require.resolve('corepack/package.json')
+# to set COREPACK_ROOT, which Yarn PnP intercepts and rejects for nested yarn workspace
+# calls inside scripts. The yarnPath below must match .yarnrc.yml's yarnPath field.
 [dependencies]
 python = "3.14.*"
 nodejs = ">=24.14,<24.15"
@@ -18,24 +19,25 @@ nodejs = ">=24.14,<24.15"
 [tasks]
 # `pixi run -m apps/apollo/pixi.toml lint`
 # Runs Apollo monorepo eslint (root package.json's `lint` script: yarn eslint).
-lint = "bash -c 'cd \"$PIXI_PROJECT_ROOT\" && corepack yarn lint'"
+lint = "bash -c 'cd \"$PIXI_PROJECT_ROOT\" && node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" lint'"
 
 # `pixi run -m apps/apollo/pixi.toml test`
 # Scoped to the auth/users specs that the Curatorium fork actively maintains.
 # The full apollo-collaboration-server suite has ~20 upstream NestJS scaffolds
 # with unwired DI providers (pre-existing); upstream Apollo CI also runs only a
 # 3/27-suite subset. Use `test-all` if you want the full picture.
-test = "bash -c 'cd \"$PIXI_PROJECT_ROOT/packages/apollo-collaboration-server\" && corepack yarn node --experimental-vm-modules $(corepack yarn bin jest) src/authentication/ src/users/'"
+test = "bash -c 'cd \"$PIXI_PROJECT_ROOT/packages/apollo-collaboration-server\" && node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" node --experimental-vm-modules $(node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" bin jest) src/authentication/ src/users/'"
 
 # `pixi run -m apps/apollo/pixi.toml test-all`
 # Full ACS jest suite - many upstream scaffolds are red.
-test-all = "bash -c 'cd \"$PIXI_PROJECT_ROOT/packages/apollo-collaboration-server\" && corepack yarn node --experimental-vm-modules $(corepack yarn bin jest)'"
+test-all = "bash -c 'cd \"$PIXI_PROJECT_ROOT/packages/apollo-collaboration-server\" && node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" node --experimental-vm-modules $(node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" bin jest)'"
 
 # `pixi run -m apps/apollo/pixi.toml build`
 # Canonical host build (mirrors Dockerfile): builds the JBrowse UMD plugin, then the
 # NestJS collaboration-server - producing the packages/*/dist that the host test + lint
 # (and the pre-commit hook) need. Run once after a fresh clone / `pixi run install`.
-build = "bash -c 'cd \"$PIXI_PROJECT_ROOT\" && (cd packages/jbrowse-plugin-apollo && JB_UMD=true corepack yarn build) && (cd packages/apollo-collaboration-server && corepack yarn build)'"
+# NOTE: yarn path must match yarnPath in .yarnrc.yml - update both together when bumping yarn.
+build = "bash -c 'cd \"$PIXI_PROJECT_ROOT\" && (cd packages/jbrowse-plugin-apollo && JB_UMD=true node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" build) && (cd packages/apollo-collaboration-server && node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" build)'"
 
 # Convenience for installing the Yarn PnP cache after pulling new commits.
-install = "bash -c 'cd \"$PIXI_PROJECT_ROOT\" && corepack yarn install --immutable'"
+install = "bash -c 'cd \"$PIXI_PROJECT_ROOT\" && node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" install --immutable'"
