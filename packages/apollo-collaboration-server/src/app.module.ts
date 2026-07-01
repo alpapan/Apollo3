@@ -58,7 +58,7 @@ const validationSchema = Joi.object({
   // Apollo cannot start in a state where the exchange path silently
   // accepts unsigned tokens.
   CURATORIUM_EXCHANGE_SECRET: Joi.string().min(32).required(),
-  // Curatorium Phase 1.5 Part A: optional aud/iss enforcement. When set,
+  // Optional aud/iss enforcement. When set,
   // JwtStrategy enforces a strict match against these values via passport-jwt.
   // Backward-compatible: unset means the upstream default (no aud/iss check).
   JWT_AUDIENCE: Joi.string().optional(),
