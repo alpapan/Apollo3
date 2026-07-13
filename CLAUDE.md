@@ -18,7 +18,7 @@ deployment stay backend-owned**
 
 ```bash
 cd ~/software/curatorium
-ENV=test pixi run curatorium admin build apollo --rebuild --drop
+ENV=test pixi run curatorium k3s build apollo --rebuild --drop
 ```
 
 Never `docker build` or `kubectl apply` directly.
