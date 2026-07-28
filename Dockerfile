@@ -1,6 +1,12 @@
 # syntax=docker/dockerfile:1
 
-FROM localhost:5000/node:24.14 AS setup
+# Defaults to the real upstream registry so a bare `docker build` (this project's
+# own CI workflow, .github/workflows/docker.yml, and any standalone clone) resolves
+# node:24.14 from Docker Hub unchanged. Curatorium's own build always overrides this
+# via skaffold.yaml.template's buildArgs, pointing every base image at its resolved
+# local registry mirror instead.
+ARG REGISTRY_HOST=docker.io
+FROM ${REGISTRY_HOST}/node:24.14 AS setup
 WORKDIR /app
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn/ .yarn/
@@ -8,7 +14,7 @@ COPY packages/ packages/
 RUN find packages/ -type f \! \( -name "package.json" -o -name "yarn.lock" \) -delete && \
 find . -type d -empty -delete
 
-FROM localhost:5000/node:24.14 AS build
+FROM ${REGISTRY_HOST}/node:24.14 AS build
 WORKDIR /app
 COPY --from=setup /app .
 RUN yarn install --immutable
@@ -23,7 +29,7 @@ RUN JB_UMD=true yarn build
 WORKDIR /app/packages/apollo-collaboration-server
 RUN yarn build
 
-FROM localhost:5000/node:24.14
+FROM ${REGISTRY_HOST}/node:24.14
 LABEL org.opencontainers.image.source=https://github.com/alpapan/Apollo3
 LABEL org.opencontainers.image.description="Curatorium-extended Apollo collaboration server (bundles the JBrowse Apollo plugin UMD and serves it from /plugin)"
 WORKDIR /app
