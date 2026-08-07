@@ -95,8 +95,26 @@ const CREDENTIAL_WORDS = [
 // name, so `pw` is judged and `PRIMARY_KEY` and `AUTHOR` are not.
 const BARE_CREDENTIAL_NAMES = new Set(['pw', 'pwd', 'pass', 'key', 'auth'])
 
-const ASSIGNMENT =
-  /["']?(?<name>[A-Za-z_][A-Za-z0-9_.-]*)["']?\s*(?::=|[:=])\s*["']?(?<value>[^\s"',;}\])]+)/g
+// Name and value are each captured from a positive class - the characters an
+// identifier and a generated secret are actually written in. Anything that is in
+// neither class, nor a separator, nor whitespace, is decoration and is matched
+// without being captured, so quoting, markdown emphasis, inline code, an HTML
+// tag or sentence punctuation never enters the value and never breaks the
+// anchored shape rules below. Capturing by exclusion instead - a denylist of
+// terminator characters - is what let a value wrapped in backticks pass.
+const DECORATION = String.raw`[^A-Za-z0-9_.+/=:\s-]*`
+const ASSIGNMENT = new RegExp(
+  String.raw`(?<name>[A-Za-z_][A-Za-z0-9_.-]*)${DECORATION}\s*(?::=|[:=])\s*${DECORATION}` +
+    String.raw`(?<value>[A-Za-z0-9+/=._-]*[A-Za-z0-9+/=_-])`,
+  'g',
+)
+
+// A value carrying a separator may hold an assignment of its own, as
+// `--from-literal=NAME=VALUE` does. Matches are non-overlapping in every regex
+// engine these guards are written in, so the outer pair swallows the inner one
+// and the scan resumes past both; each captured value is therefore scanned again.
+const SEPARATOR_INSIDE = /[:=]/
+const MAX_NESTED_ASSIGNMENTS = 4
 
 const UUID =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
@@ -192,11 +210,26 @@ function lineOffends(line: string): boolean {
   if (PROVIDER_TOKEN.test(line)) {
     return true
   }
-  for (const match of line.matchAll(ASSIGNMENT)) {
-    const groups = match.groups as { name: string; value: string }
-    if (isCredentialName(groups.name) && isSecretShaped(groups.value)) {
-      return true
+  // Every rescan is over a strictly shorter string, and the depth is bounded so
+  // a pathological line cannot drive the scan indefinitely.
+  let texts = [line]
+  for (let depth = 0; depth < MAX_NESTED_ASSIGNMENTS; depth += 1) {
+    const nested: string[] = []
+    for (const text of texts) {
+      for (const match of text.matchAll(ASSIGNMENT)) {
+        const groups = match.groups as { name: string; value: string }
+        if (isCredentialName(groups.name) && isSecretShaped(groups.value)) {
+          return true
+        }
+        if (SEPARATOR_INSIDE.test(groups.value)) {
+          nested.push(groups.value)
+        }
+      }
     }
+    if (nested.length === 0) {
+      return false
+    }
+    texts = nested
   }
   return false
 }
@@ -285,6 +318,11 @@ describe('no real credentials in curatorium-authored files', () => {
       // An issuer prefix named in prose is not a token. Requiring the body
       // length is what separates the two.
       'prose naming the ghp_ prefix, or AKIA, carries no token',
+      // Decoration is tolerated around a name and a value, not treated as part
+      // of either, so a name that merely reads as a credential in prose still
+      // forms no pair and a path-shaped value is still no secret.
+      'we set the ORCID_CLIENT_SECRET in the env file',
+      'token: docs/plans/reviews/a-review-r1.md',
     ]
     for (const line of admitted) {
       expect([line, lineOffends(line)]).toEqual([line, false])
@@ -305,6 +343,23 @@ describe('no real credentials in curatorium-authored files', () => {
       'API_KEY = "AKIAIOSFODNN7EXAMPLE"',
       'TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.aBcDeFgHiJkLmNoPqRsTuVwXyZ01234"',
       'aBareNameButAnIssuerPrefixedToken = ghp_16C7e42F292c6912E7710c838347Ae178B4a',
+      // Decoration around the name or the value. A guard whose value class is a
+      // denylist of terminators captures the decoration too, fails its own
+      // anchored shape test, and reports the line clean - which is how two real
+      // values sat in tracked markdown while this guard passed.
+      `\`ORCID_CLIENT_SECRET=${real}\``,
+      `The value was ORCID_CLIENT_SECRET=${real}.`,
+      `**ORCID_CLIENT_SECRET**: \`${real}\``,
+      `~~ORCID_CLIENT_SECRET~~=${real}`,
+      `<code>ORCID_CLIENT_SECRET=${real}</code>`,
+      `ORCID_CLIENT_SECRET=${real}!`,
+      `was ORCID_CLIENT_SECRET=${real}?`,
+      `ORCID_CLIENT_SECRET=\u201C${real}\u201D`,
+      `{orcid_client_secret: ${real}}`,
+      // An assignment nested inside the value of an outer one. A
+      // non-overlapping scan binds the outer pair and steps over the inner.
+      `kubectl create secret generic x --from-literal=orcid-client-secret=${real}`,
+      `--opt=--from-literal=orcid-client-secret=${real}`,
     ]
     for (const line of rejected) {
       expect([line, lineOffends(line)]).toEqual([line, true])
