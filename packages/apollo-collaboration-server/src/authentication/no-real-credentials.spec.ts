@@ -29,6 +29,16 @@ import path from 'node:path'
 
 const PLACEHOLDER = '00000000-0000-0000-0000-000000000000'
 
+// The seeded secret manifest carries one unfilled placeholder per key, and
+// resolve_secret treats a stored value beginning with this prefix as unset and
+// mints a fresh secret over it, so such a value never reaches a pod and
+// authenticates nowhere. A placeholder that spells out the width it wants passes
+// 40 characters while mixing classes, which is the written-out phrase the shape
+// rule is documented not to judge. The prefix is what that code tests, so it is
+// what this admits: a value carrying the word anywhere later is replaced by
+// nothing and stays judged.
+const BOOTSTRAP_PLACEHOLDER_PREFIX = 'CHANGE_ME'
+
 // Every path this fork has authored or changed relative to upstream, filtered
 // to the file kinds a credential can hide in. Regenerate with:
 //   git diff --name-only $(git merge-base origin/main curatorium) curatorium
@@ -125,7 +135,13 @@ const HEX_TOKEN = /^[0-9a-fA-F]{32,}$/
 // placeholder reaches 60 characters just as easily, and judging it would make
 // the guard cry wolf. Generated material also mixes character classes, and a
 // phrase a human typed does not, so both conditions must hold.
-const BASE64_TOKEN = /^[A-Za-z0-9+/]{40,}={0,2}$/
+// The alphabet covers URL-safe base64 (`-` and `_`) as well as standard, because
+// the URL-safe form is what this stack actually mints: `secrets.token_urlsafe(32)`
+// for every callback HMAC and personal access token, and `Fernet.generate_key()`
+// for every encryption key. Restricting the class to `+/` did not merely miss a
+// variant spelling - it admitted those values whenever their random bytes encoded
+// a `-` or `_`, which at 43 characters is nearly every one of them.
+const BASE64_TOKEN = /^[A-Za-z0-9+/_-]{40,}={0,2}$/
 const HAS_LOWER = /[a-z]/
 const HAS_UPPER = /[A-Z]/
 const HAS_DIGIT = /[0-9]/
@@ -193,7 +209,7 @@ function looksGenerated(value: string): boolean {
 }
 
 function isSecretShaped(value: string): boolean {
-  if (value === PLACEHOLDER) {
+  if (value === PLACEHOLDER || value.startsWith(BOOTSTRAP_PLACEHOLDER_PREFIX)) {
     return false
   }
   if (UUID.test(value) || HEX_TOKEN.test(value)) {
@@ -323,6 +339,13 @@ describe('no real credentials in curatorium-authored files', () => {
       // forms no pair and a path-shaped value is still no secret.
       'we set the ORCID_CLIENT_SECRET in the env file',
       'token: docs/plans/reviews/a-review-r1.md',
+      // An unfilled bootstrap placeholder. resolve_secret treats any value
+      // beginning CHANGE_ME as unset and mints a fresh secret over it, so such a
+      // value never reaches a pod and authenticates nowhere. The seeded manifest
+      // writes one per key, and a placeholder spelling out the width it wants
+      // passes 40 characters while mixing classes, which is the written-out
+      // phrase the shape rule is documented not to judge.
+      'CURATORIUM_JWT_SECRET: "CHANGE_ME_replace_with_a_64_byte_hex_signing_secret"',
     ]
     for (const line of admitted) {
       expect([line, lineOffends(line)]).toEqual([line, false])
@@ -342,6 +365,11 @@ describe('no real credentials in curatorium-authored files', () => {
       'API_TOKEN = "ghp_16C7e42F292c6912E7710c838347Ae178B4a"',
       'API_KEY = "AKIAIOSFODNN7EXAMPLE"',
       'TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.aBcDeFgHiJkLmNoPqRsTuVwXyZ01234"',
+      // URL-safe base64, 43 characters carrying both `-` and `_`: the shape of
+      // `secrets.token_urlsafe(32)`, and of a Fernet key with its trailing pad.
+      // Synthetic - authenticates nowhere.
+      'SLURM_CALLBACK_TOKEN = "aB3dEf5GhI7jKl9MnO1pQr3StU5vWx7YzA9bCd-Ef_h"',
+      'USER_CREDENTIALS_ENCRYPTION_KEY = "aB3dEf5GhI7jKl9MnO1pQr3StU5vWx7YzA9bCd-Ef_h="',
       'aBareNameButAnIssuerPrefixedToken = ghp_16C7e42F292c6912E7710c838347Ae178B4a',
       // Decoration around the name or the value. A guard whose value class is a
       // denylist of terminators captures the decoration too, fails its own
@@ -360,6 +388,14 @@ describe('no real credentials in curatorium-authored files', () => {
       // non-overlapping scan binds the outer pair and steps over the inner.
       `kubectl create secret generic x --from-literal=orcid-client-secret=${real}`,
       `--opt=--from-literal=orcid-client-secret=${real}`,
+      // The bootstrap placeholder is admitted by its PREFIX, matching what
+      // resolve_secret tests. A value merely carrying the word later on is
+      // replaced by nothing and is still a credential.
+      'SECRET = "not_CHANGE_ME_aB3dEf5GhI7jKl9MnO1pQr3StU5vWx7YzA9bCd-Ef_h"',
+      // Case-sensitively, as resolve_secret tests it. A lowercased spelling is
+      // not the placeholder that code replaces, so a value wearing it is live
+      // and stays judged.
+      'SECRET = "change_me_aB3dEf5GhI7jKl9MnO1pQr3StU5vWx7YzA9bCd-Ef_h"',
     ]
     for (const line of rejected) {
       expect([line, lineOffends(line)]).toEqual([line, true])
