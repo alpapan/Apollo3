@@ -53,5 +53,25 @@ COPY --from=build /app/packages/jbrowse-plugin-apollo/dist/jbrowse-plugin-apollo
 # (jbrowse-plugin-apollo/src/session/session.ts:339) so install matches fallback.
 ADD --chmod=644 https://github.com/The-Sequence-Ontology/SO-Ontologies/raw/01c33c6d9b6c8dca12e7d3e37b49ee113093c2fa/Ontology_Files/so.json /app/plugin/sequence_ontology.json
 RUN yarn workspaces focus --production @apollo-annotation/collaboration-server
+
+# The deployment declares the id this runs as, so nothing here may be laid out around a
+# particular one. Group-owning the application tree to 0 and copying the user bits to the
+# group bits is what lets an arbitrary uid read and write it: a Kubernetes container
+# always carries gid 0 as a supplementary group. Durable state belongs on the claim, which
+# the kubelet chowns to fsGroup; this covers the container layer the process still writes
+# because its root filesystem is not read-only.
+RUN chgrp -R 0 /app && chmod -R g=u /app
+
+# The base image's passwd names uid 1000 and nothing else, so an arbitrary declared uid
+# has no entry to derive HOME from and it degrades to /. Yarn resolves its cache and
+# global folder from HOME, and this container's root filesystem is not read-only, so the
+# failure lands at run time rather than at admission. Stating it points HOME at the tree
+# the line above just made group-writable.
+ENV HOME=/app
+
+# A numeric non-root default for running this image outside Kubernetes. The pod's own
+# securityContext overrides it, and nothing in the image depends on this number.
+USER 1000
+
 EXPOSE 3999
 CMD ["yarn", "start:prod"]
