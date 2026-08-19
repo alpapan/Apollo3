@@ -38,12 +38,12 @@ lint = "bash -c 'cd \"$PIXI_PROJECT_ROOT\" && node \"$PIXI_PROJECT_ROOT/.yarn/re
 # cross-host connect to, crashing the whole jest process. A one-shot plain
 # jest run (no --watch) gets nothing from watchman, so disable it outright
 # rather than manage a daemon that can never be shared correctly.
-test = "bash -c 'cd \"$PIXI_PROJECT_ROOT/packages/apollo-collaboration-server\" && node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" node --experimental-vm-modules $(node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" bin jest) --watchman=false src/authentication/ src/users/ src/jbrowse/jbrowse.service.spec.ts'"
+test = "bash -c 'cd \"$PIXI_PROJECT_ROOT/packages/apollo-collaboration-server\" && LOG=\"$(mktemp)\"; node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" node --experimental-vm-modules $(node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" bin jest) --watchman=false src/authentication/ src/users/ src/jbrowse/jbrowse.service.spec.ts > \"$LOG\" 2>&1; rc=$?; grep -E \"^FAIL \" \"$LOG\"; grep -E \"^(Test Suites|Tests|Snapshots|Time): \" \"$LOG\" | sed -E \"s/, [0-9]+ passed//g; s/[0-9]+ passed, //g; s/[0-9]+ passed//g\"; echo \"Full log: $LOG\"; exit $rc'"
 
 # `pixi run -m apps/apollo/pixi.toml test-all`
 # Full ACS jest suite - many upstream scaffolds are red.
 # --watchman=false: see the note on `test` above - same cross-host socket hazard.
-test-all = "bash -c 'cd \"$PIXI_PROJECT_ROOT/packages/apollo-collaboration-server\" && node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" node --experimental-vm-modules $(node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" bin jest) --watchman=false'"
+test-all = "bash -c 'cd \"$PIXI_PROJECT_ROOT/packages/apollo-collaboration-server\" && LOG=\"$(mktemp)\"; node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" node --experimental-vm-modules $(node \"$PIXI_PROJECT_ROOT/.yarn/releases/yarn-4.14.1.cjs\" bin jest) --watchman=false > \"$LOG\" 2>&1; rc=$?; grep -E \"^FAIL \" \"$LOG\"; grep -E \"^(Test Suites|Tests|Snapshots|Time): \" \"$LOG\" | sed -E \"s/, [0-9]+ passed//g; s/[0-9]+ passed, //g; s/[0-9]+ passed//g\"; echo \"Full log: $LOG\"; exit $rc'"
 
 # `pixi run -m apps/apollo/pixi.toml build`
 # Canonical host build (mirrors Dockerfile): builds the JBrowse UMD plugin, then the
