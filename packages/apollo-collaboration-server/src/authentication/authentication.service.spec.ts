@@ -43,25 +43,29 @@ function signInnerJwt(claims: object, secret = TEST_EXCHANGE_SECRET) {
   return jwt.sign(claims, secret, { algorithm: 'HS256' })
 }
 
+type AsyncFn = (...args: unknown[]) => Promise<unknown>
+type AddNewFn = (dto: { role: string }) => Promise<unknown>
+type ConfigGetFn = (key: string) => string | undefined
+
 describe('AuthenticationService', () => {
   let service: AuthenticationService
   let usersService: {
-    findByEmail: jest.Mock
-    addNew: jest.Mock
-    updateRoleAndTracking: jest.Mock
-    findAll: jest.Mock
+    findByEmail: jest.Mock<AsyncFn>
+    addNew: jest.Mock<AddNewFn>
+    updateRoleAndTracking: jest.Mock<AsyncFn>
+    findAll: jest.Mock<AsyncFn>
   }
-  let configService: { get: jest.Mock }
+  let configService: { get: jest.Mock<ConfigGetFn> }
 
   beforeEach(async () => {
     usersService = {
-      findByEmail: jest.fn(),
-      addNew: jest.fn(),
-      updateRoleAndTracking: jest.fn(),
-      findAll: jest.fn().mockResolvedValue([]),
+      findByEmail: jest.fn<AsyncFn>(),
+      addNew: jest.fn<AddNewFn>(),
+      updateRoleAndTracking: jest.fn<AsyncFn>(),
+      findAll: jest.fn<AsyncFn>().mockResolvedValue([]),
     }
     configService = {
-      get: jest.fn((key: string) => {
+      get: jest.fn<ConfigGetFn>((key: string) => {
         if (key === 'CURATORIUM_EXCHANGE_SECRET') {
           return TEST_EXCHANGE_SECRET
         }
@@ -150,6 +154,9 @@ describe('AuthenticationService', () => {
 
     // Split, tamper the payload's role claim to 'admin', keep original signature
     const [headerB64, payloadB64, sigB64] = validToken.split('.')
+    if (!headerB64 || !payloadB64 || !sigB64) {
+      throw new Error('signInnerJwt did not return a three-part token')
+    }
     const payload = JSON.parse(
       Buffer.from(payloadB64, 'base64url').toString('utf8'),
     )
