@@ -73,13 +73,18 @@ export class PluginsModule {
         try {
           await response.body.pipeTo(file)
         } catch (error) {
-          fs.unlinkSync(pluginLocation)
           console.error(error)
           throw error
         }
         plugin = await import(pluginLocationRelative)
       } finally {
-        await fsPromises.rm(tmpDir, { recursive: true })
+        // A cleanup failure is logged, never thrown, so it cannot replace the
+        // error from the try block (or fail an otherwise successful load).
+        try {
+          await fsPromises.rm(tmpDir, { recursive: true, force: true })
+        } catch (error) {
+          console.error(`Could not remove plugin directory "${tmpDir}"`, error)
+        }
       }
       if (!plugin) {
         throw new Error(`Could not load plugin: ${url}`)

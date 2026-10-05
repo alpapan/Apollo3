@@ -14,12 +14,12 @@
     "start:nest": "NODE_ENV=development nest start",
     "start:no-watch": "yarn build:shared && yarn start:nest",
     "start:prod": "NODE_ENV=production node dist/main.js",
-    "test": "yarn node --experimental-vm-modules $(yarn bin jest)",
+    "test": "yarn node --experimental-vm-modules $(yarn bin jest) --maxWorkers=$(bash ../../scripts/cpu_share.sh)",
     "test:cli:start": "ALLOW_ROOT_USER=true ROOT_USER_PASSWORD=pass MONGODB_URI=\"mongodb://localhost:27017/apolloTestCliDb?directConnection=true\" LOG_LEVELS=error,warn yarn start",
-    "test:cov": "yarn node --experimental-vm-modules $(yarn bin jest) --coverage",
+    "test:cov": "yarn node --experimental-vm-modules $(yarn bin jest) --maxWorkers=$(bash ../../scripts/cpu_share.sh) --coverage",
     "test:debug": "yarn node --inspect-brk --experimental-vm-modules $(yarn bin jest) --runInBand",
-    "test:e2e": "yarn node --experimental-vm-modules $(yarn bin jest) --config ./test/jest-e2e.json",
-    "test:watch": "yarn node --experimental-vm-modules $(yarn bin jest) --watch"
+    "test:e2e": "yarn node --experimental-vm-modules $(yarn bin jest) --maxWorkers=$(bash ../../scripts/cpu_share.sh) --config ./test/jest-e2e.json",
+    "test:watch": "yarn node --experimental-vm-modules $(yarn bin jest) --maxWorkers=$(bash ../../scripts/cpu_share.sh) --watch"
   },
   "jest": {
     "collectCoverageFrom": [
@@ -103,6 +103,7 @@
   },
   "devDependencies": {
     "@apollo-annotation/mst": "workspace:^",
+    "@jest/globals": "^29.0.3",
     "@nestjs/cli": "^10.1.10",
     "@nestjs/schematics": "^10.0.1",
     "@nestjs/testing": "^10.1.0",
