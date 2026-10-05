@@ -6,10 +6,12 @@ import { AuthenticationService } from './authentication.service.js'
 
 describe('AuthenticationController', () => {
   let controller: AuthenticationController
-  let exchangeSpy: jest.Mock
+  let exchangeSpy: jest.Mock<(token: string) => Promise<unknown>>
 
   beforeEach(async () => {
-    exchangeSpy = jest.fn().mockResolvedValue({ token: 'apollo-canned' })
+    exchangeSpy = jest
+      .fn<(token: string) => Promise<unknown>>()
+      .mockResolvedValue({ token: 'apollo-canned' })
     const authService = { exchangeCuratoriumToken: exchangeSpy }
 
     const module: TestingModule = await Test.createTestingModule({
