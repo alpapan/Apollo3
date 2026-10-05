@@ -103,6 +103,7 @@
   },
   "devDependencies": {
     "@apollo-annotation/mst": "workspace:^",
+    "@jest/globals": "^29.0.3",
     "@nestjs/cli": "^10.1.10",
     "@nestjs/schematics": "^10.0.1",
     "@nestjs/testing": "^10.1.0",
