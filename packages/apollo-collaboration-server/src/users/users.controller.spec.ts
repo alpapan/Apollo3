@@ -17,11 +17,11 @@ describe('UsersController', () => {
       find: jest.fn(),
       findById: jest.fn(),
       findOne: jest.fn(),
-      findByIdAndUpdate: jest
-        .fn()
-        .mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
-      countDocuments: jest.fn().mockReturnValue({
-        exec: jest.fn().mockResolvedValue(0),
+      findByIdAndUpdate: jest.fn<() => unknown>().mockReturnValue({
+        exec: jest.fn<() => Promise<unknown>>().mockResolvedValue({}),
+      }),
+      countDocuments: jest.fn<() => unknown>().mockReturnValue({
+        exec: jest.fn<() => Promise<unknown>>().mockResolvedValue(0),
       }),
     }
 
