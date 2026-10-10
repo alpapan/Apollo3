@@ -495,7 +495,12 @@ function drawHover(
   if (!featureTypeOntology) {
     throw new Error('featureTypeOntology is undefined')
   }
-  if (!featureTypeOntology.isTypeOf(feature.type, 'transcript')) {
+  if (
+    !(
+      featureTypeOntology.isTypeOf(feature.type, 'transcript') ||
+      featureTypeOntology.isTypeOf(feature.type, 'pseudogenic_transcript')
+    )
+  ) {
     return
   }
   const featureID: string | undefined = feature.attributes
@@ -665,7 +670,9 @@ function getDraggableFeatureInfo(
   if (!featureTypeOntology) {
     throw new Error('featureTypeOntology is undefined')
   }
-  const isTranscript = featureTypeOntology.isTypeOf(feature.type, 'transcript')
+  const isTranscript =
+    featureTypeOntology.isTypeOf(feature.type, 'transcript') ||
+    featureTypeOntology.isTypeOf(feature.type, 'pseudogenic_transcript')
   const featureID: string | undefined = feature.attributes
     .get('gff_id')
     ?.toString()
@@ -751,7 +758,9 @@ function drawTooltip(
   if (!featureTypeOntology) {
     throw new Error('featureTypeOntology is undefined')
   }
-  const isTranscript = featureTypeOntology.isTypeOf(feature.type, 'transcript')
+  const isTranscript =
+    featureTypeOntology.isTypeOf(feature.type, 'transcript') ||
+    featureTypeOntology.isTypeOf(feature.type, 'pseudogenic_transcript')
   if (!isTranscript) {
     return
   }
@@ -783,7 +792,7 @@ function drawTooltip(
     return
   }
   const { max, min, phase } = cds
-  location += `${min + 1}–${max}`
+  location += `${min + 1}-${max}`
 
   let startPx =
     (lgv.bpToPx({

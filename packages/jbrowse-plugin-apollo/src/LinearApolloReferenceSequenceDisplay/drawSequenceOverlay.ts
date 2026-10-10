@@ -4,6 +4,7 @@ import type { BlockSet, ContentBlock } from '@jbrowse/core/util/blockTypes'
 import type { Theme } from '@mui/material'
 
 import type { ApolloSessionModel, HoveredFeature } from '../session'
+import { isTranscriptFeature } from '../util'
 
 function getSeqRow(
   strand: 1 | -1 | undefined,
@@ -95,10 +96,17 @@ function drawCDSHighlight(
   rowHeight: number,
   block: ContentBlock,
   theme: Theme,
+  session: ApolloSessionModel,
   selected = false,
 ) {
   const parentFeature = feature.parent
   if (!parentFeature) {
+    return
+  }
+  // The feature type ontology loads asynchronously. Until it has, the parent
+  // is not recognised as a transcript and reading cdsLocations would throw.
+  // This read is tracked, so the draw reruns once the ontology has loaded.
+  if (!isTranscriptFeature(parentFeature, session)) {
     return
   }
   const cdsLocs = parentFeature.cdsLocations.find((loc) => {
@@ -154,6 +162,7 @@ export function drawSequenceOverlay(
           rowHeight,
           block,
           theme,
+          session,
           feature._id === selectedFeature?._id,
         )
       } else {

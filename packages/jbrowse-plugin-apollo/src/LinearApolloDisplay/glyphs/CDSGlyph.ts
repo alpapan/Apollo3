@@ -6,7 +6,7 @@ import type { MenuItem } from '@jbrowse/core/ui'
 import { getFrame } from '@jbrowse/core/util'
 import type { ContentBlock } from '@jbrowse/core/util/blockTypes'
 
-import { isSelectedFeature } from '../../util'
+import { isSelectedFeature, isTranscriptFeature } from '../../util'
 import type { LinearApolloDisplay } from '../stateModel'
 
 import { boxGlyph } from './BoxGlyph'
@@ -70,6 +70,12 @@ function draw(
   const transcript = cds.parent
   if (!transcript) {
     boxGlyph.draw(display, ctx, cds, row, 0, block)
+    return
+  }
+  // The feature type ontology loads asynchronously. Until it has, the parent
+  // is not recognised as a transcript and reading cdsLocations would throw.
+  // This read is tracked, so the draw reruns once the ontology has loaded.
+  if (!isTranscriptFeature(transcript, display.session)) {
     return
   }
   const { cdsLocations } = transcript
