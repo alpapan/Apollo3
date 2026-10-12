@@ -345,6 +345,14 @@ export class AuthenticationService {
       throw new UnauthorizedException('Invalid exchange token')
     }
 
+    // Rejected before the replay record is touched: a token that can never be
+    // accepted must not take a slot there, or enough of them would push
+    // accepted tokens out of the record and let those be replayed.
+    if (!ALLOWED_EXCHANGE_ROLES.has(payload.role as Role)) {
+      throw new UnauthorizedException(`Unknown role: ${payload.role}`)
+    }
+    const role = payload.role as Role
+
     // Replay defence: TTL purge, then size-cap (FIFO), then check + record.
     // Relies on `Map` insertion-order iteration (ES6 guarantee) for FIFO:
     // oldest entry first, so we can break on the first non-expired entry.
@@ -369,11 +377,6 @@ export class AuthenticationService {
       this.seenJtis.delete(oldest)
     }
     this.seenJtis.set(payload.jti, now)
-
-    if (!ALLOWED_EXCHANGE_ROLES.has(payload.role as Role)) {
-      throw new UnauthorizedException(`Unknown role: ${payload.role}`)
-    }
-    const role = payload.role as Role
 
     let user = await this.usersService.findByEmail(payload.email)
     if (user) {
