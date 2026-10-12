@@ -16,7 +16,7 @@ export default function HomepageFeatures(): React.JSX.Element {
                 className="button button--secondary button--lg"
                 to="//demo.apollo.jbrowse.org/?session=share-eZDit63bNm&password=Px6yn"
               >
-                Try a Demo — 🧬
+                Try a Demo - 🧬
               </Link>
             </div>
             <img
