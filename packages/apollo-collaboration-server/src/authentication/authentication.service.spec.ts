@@ -1,98 +1,35 @@
 import { randomUUID } from 'node:crypto'
 
-import { jest } from '@jest/globals'
 import { UnauthorizedException } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
-import { JwtService } from '@nestjs/jwt'
-import { Test, type TestingModule } from '@nestjs/testing'
 import jwt from 'jsonwebtoken'
 
-import { PluginsService } from '../plugins/plugins.service.js'
-import { UsersService } from '../users/users.service.js'
 import { Role } from '../utils/role/role.enum.js'
 
-import { AuthenticationService } from './authentication.service.js'
+import {
+  TEST_APOLLO_JWT_SECRET,
+  buildInnerClaims,
+  makeAuthenticationService,
+  signInnerJwt,
+} from './authentication.test-support.js'
 
-const TEST_EXCHANGE_SECRET = 'a'.repeat(64)
-const TEST_APOLLO_JWT_SECRET = 'b'.repeat(64)
+const EMAIL = '0000-0001-0000-0001@curatorium.app'
+const USERNAME = 'apollo-0000-0001-0000-0001'
 
-interface InnerClaimsOverride {
-  username?: string
-  email?: string
-  role?: string
-  id1_kid?: string
-  id1_boot_id?: string
-  jti?: string
-  expSeconds?: number
-}
-
-function buildInnerClaims(overrides: InnerClaimsOverride = {}) {
-  const now = Math.floor(Date.now() / 1000)
-  return {
-    username: overrides.username ?? 'apollo-0000-0001-0000-0001',
-    email: overrides.email ?? '0000-0001-0000-0001@curatorium.app',
-    role: overrides.role ?? 'user',
-    id1_kid: overrides.id1_kid ?? 'kid-1',
-    id1_boot_id: overrides.id1_boot_id ?? 'boot-1',
-    jti: overrides.jti ?? randomUUID(),
-    iat: now,
-    exp: now + (overrides.expSeconds ?? 60),
+function decode(token: string) {
+  return jwt.verify(token, TEST_APOLLO_JWT_SECRET) as {
+    username: string
+    email: string
+    role: string
+    id: string
+    iss?: string
   }
 }
-
-function signInnerJwt(claims: object, secret = TEST_EXCHANGE_SECRET) {
-  return jwt.sign(claims, secret, { algorithm: 'HS256' })
-}
-
-type AsyncFn = (...args: unknown[]) => Promise<unknown>
-type AddNewFn = (dto: { role: string }) => Promise<unknown>
-type ConfigGetFn = (key: string) => string | undefined
 
 describe('AuthenticationService', () => {
-  let service: AuthenticationService
-  let usersService: {
-    findByEmail: jest.Mock<AsyncFn>
-    addNew: jest.Mock<AddNewFn>
-    updateRoleAndTracking: jest.Mock<AsyncFn>
-    findAll: jest.Mock<AsyncFn>
-  }
-  let configService: { get: jest.Mock<ConfigGetFn> }
+  let { service, userModel } = makeAuthenticationService()
 
-  beforeEach(async () => {
-    usersService = {
-      findByEmail: jest.fn<AsyncFn>(),
-      addNew: jest.fn<AddNewFn>(),
-      updateRoleAndTracking: jest.fn<AsyncFn>(),
-      findAll: jest.fn<AsyncFn>().mockResolvedValue([]),
-    }
-    configService = {
-      get: jest.fn<ConfigGetFn>((key: string) => {
-        if (key === 'CURATORIUM_EXCHANGE_SECRET') {
-          return TEST_EXCHANGE_SECRET
-        }
-        if (key === 'DEFAULT_NEW_USER_ROLE') {
-          return Role.User
-        }
-        return
-      }),
-    }
-
-    const jwtService = new JwtService({
-      secret: TEST_APOLLO_JWT_SECRET,
-      signOptions: { algorithm: 'HS256' },
-    })
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuthenticationService,
-        { provide: UsersService, useValue: usersService },
-        { provide: JwtService, useValue: jwtService },
-        { provide: ConfigService, useValue: configService },
-        { provide: PluginsService, useValue: {} },
-      ],
-    }).compile()
-
-    service = module.get<AuthenticationService>(AuthenticationService)
+  beforeEach(() => {
+    ;({ service, userModel } = makeAuthenticationService())
   })
 
   it('should be defined', () => {
@@ -100,31 +37,17 @@ describe('AuthenticationService', () => {
   })
 
   it('exchangeCuratoriumToken_acceptsValidTokenAndReturnsApolloJwt', async () => {
-    usersService.findByEmail.mockResolvedValue(null)
-    usersService.addNew.mockResolvedValue({
-      id: 'mongo-id-1',
-      username: 'apollo-0000-0001-0000-0001',
-      email: '0000-0001-0000-0001@curatorium.app',
-      role: 'user',
-    })
-
     const claims = buildInnerClaims()
-    const innerJwt = signInnerJwt(claims)
 
-    const result = await service.exchangeCuratoriumToken(innerJwt)
+    const result = await service.exchangeCuratoriumToken(signInnerJwt(claims))
 
     expect(result).toHaveProperty('token')
-    const decoded = jwt.verify(result.token, TEST_APOLLO_JWT_SECRET) as {
-      username: string
-      email: string
-      role: string
-      id: string
-    }
+    const decoded = decode(result.token)
     expect(decoded.email).toBe(claims.email)
     expect(decoded.role).toBe('user')
-    expect(decoded.id).toBe('mongo-id-1')
+    expect(decoded.id).toBe(userModel.docs[0]?.id)
     // No iss=curatorium-backend - Apollo mints, not curatorium
-    expect((decoded as { iss?: string }).iss).not.toBe('curatorium-backend')
+    expect(decoded.iss).not.toBe('curatorium-backend')
   })
 
   it('exchangeCuratoriumToken_rejectsMalformedToken', async () => {
@@ -176,15 +99,7 @@ describe('AuthenticationService', () => {
   })
 
   it('exchangeCuratoriumToken_rejectsReplayWithinWindow', async () => {
-    usersService.findByEmail.mockResolvedValue(null)
-    usersService.addNew.mockResolvedValue({
-      id: 'mongo-id-1',
-      username: 'apollo-0000-0001-0000-0001',
-      email: '0000-0001-0000-0001@curatorium.app',
-      role: 'user',
-    })
-    const claims = buildInnerClaims({ jti: randomUUID() })
-    const innerJwt = signInnerJwt(claims)
+    const innerJwt = signInnerJwt(buildInnerClaims({ jti: randomUUID() }))
 
     await service.exchangeCuratoriumToken(innerJwt)
     await expect(
@@ -193,14 +108,6 @@ describe('AuthenticationService', () => {
   })
 
   it('exchangeCuratoriumToken_createsUserOnFirstLogin', async () => {
-    usersService.findByEmail.mockResolvedValue(null)
-    usersService.addNew.mockResolvedValue({
-      id: 'mongo-id-new',
-      username: 'apollo-0000-0001-0000-0001',
-      email: '0000-0001-0000-0001@curatorium.app',
-      role: 'user',
-    })
-
     const claims = buildInnerClaims({
       role: 'user',
       id1_kid: 'kid-A',
@@ -208,88 +115,67 @@ describe('AuthenticationService', () => {
     })
     await service.exchangeCuratoriumToken(signInnerJwt(claims))
 
-    expect(usersService.addNew).toHaveBeenCalledWith({
+    expect(userModel.docs).toHaveLength(1)
+    expect(userModel.docs[0]).toMatchObject({
       username: claims.username,
       email: claims.email,
       role: 'user',
+      lastId1Kid: 'kid-A',
+      lastId1BootId: 'boot-X',
     })
-    expect(usersService.updateRoleAndTracking).toHaveBeenCalledWith(
-      'mongo-id-new',
-      'user',
-      'kid-A',
-      'boot-X',
-    )
   })
 
   it('exchangeCuratoriumToken_doesNotResyncRoleWhenKidAndBootIdMatch', async () => {
-    usersService.findByEmail.mockResolvedValue({
-      id: 'mongo-id-existing',
-      username: 'apollo-0000-0001-0000-0001',
-      email: '0000-0001-0000-0001@curatorium.app',
-      role: 'user',
+    await userModel.create({ username: USERNAME, email: EMAIL, role: 'user' })
+    Object.assign(userModel.docs[0] ?? {}, {
       lastId1Kid: 'kid-1',
       lastId1BootId: 'boot-1',
     })
 
-    const claims = buildInnerClaims({
-      id1_kid: 'kid-1',
-      id1_boot_id: 'boot-1',
-    })
-    await service.exchangeCuratoriumToken(signInnerJwt(claims))
-
-    expect(usersService.addNew).not.toHaveBeenCalled()
-    expect(usersService.updateRoleAndTracking).not.toHaveBeenCalled()
-  })
-
-  it('exchangeCuratoriumToken_resyncsRoleWhenKidChanges', async () => {
-    usersService.findByEmail.mockResolvedValue({
-      id: 'mongo-id-existing',
-      username: 'apollo-0000-0001-0000-0001',
-      email: '0000-0001-0000-0001@curatorium.app',
-      role: 'user',
-      lastId1Kid: 'kid-OLD',
-      lastId1BootId: 'boot-1',
-    })
-
-    const claims = buildInnerClaims({
-      role: 'admin',
-      id1_kid: 'kid-NEW',
-      id1_boot_id: 'boot-1',
-    })
-    await service.exchangeCuratoriumToken(signInnerJwt(claims))
-
-    expect(usersService.updateRoleAndTracking).toHaveBeenCalledWith(
-      'mongo-id-existing',
-      'admin',
-      'kid-NEW',
-      'boot-1',
+    // The claim says admin, but kid and boot id are unchanged, so the stored
+    // role stays as it was.
+    const result = await service.exchangeCuratoriumToken(
+      signInnerJwt(
+        buildInnerClaims({
+          role: 'admin',
+          id1_kid: 'kid-1',
+          id1_boot_id: 'boot-1',
+        }),
+      ),
     )
+
+    expect(userModel.docs).toHaveLength(1)
+    expect(userModel.docs[0]?.role).toBe('user')
+    expect(decode(result.token).role).toBe('user')
   })
 
-  it('exchangeCuratoriumToken_resyncsRoleWhenBootIdChanges', async () => {
-    usersService.findByEmail.mockResolvedValue({
-      id: 'mongo-id-existing',
-      username: 'apollo-0000-0001-0000-0001',
-      email: '0000-0001-0000-0001@curatorium.app',
-      role: 'user',
-      lastId1Kid: 'kid-1',
-      lastId1BootId: 'boot-OLD',
-    })
+  it.each([
+    ['kid changes', 'admin', 'kid-NEW', 'boot-1'],
+    ['boot id changes', 'readOnly', 'kid-1', 'boot-NEW'],
+  ])(
+    'exchangeCuratoriumToken_resyncsRoleWhen %s',
+    async (_name, role, kid, bootId) => {
+      await userModel.create({ username: USERNAME, email: EMAIL, role: 'user' })
+      Object.assign(userModel.docs[0] ?? {}, {
+        lastId1Kid: 'kid-1',
+        lastId1BootId: 'boot-1',
+      })
 
-    const claims = buildInnerClaims({
-      role: 'readOnly',
-      id1_kid: 'kid-1',
-      id1_boot_id: 'boot-NEW',
-    })
-    await service.exchangeCuratoriumToken(signInnerJwt(claims))
+      const result = await service.exchangeCuratoriumToken(
+        signInnerJwt(
+          buildInnerClaims({ role, id1_kid: kid, id1_boot_id: bootId }),
+        ),
+      )
 
-    expect(usersService.updateRoleAndTracking).toHaveBeenCalledWith(
-      'mongo-id-existing',
-      'readOnly',
-      'kid-1',
-      'boot-NEW',
-    )
-  })
+      expect(userModel.docs).toHaveLength(1)
+      expect(userModel.docs[0]).toMatchObject({
+        role,
+        lastId1Kid: kid,
+        lastId1BootId: bootId,
+      })
+      expect(decode(result.token).role).toBe(role)
+    },
+  )
 
   describe.each([['superuser'], ['none']])('rejects role=%s', (badRole) => {
     it(`rejects role=${badRole} with UnauthorizedException`, async () => {
@@ -298,55 +184,42 @@ describe('AuthenticationService', () => {
       await expect(
         service.exchangeCuratoriumToken(innerJwt),
       ).rejects.toBeInstanceOf(UnauthorizedException)
+      expect(userModel.docs).toHaveLength(0)
     })
   })
 
   it('exchangeCuratoriumToken_handlesRoleDemotion', async () => {
-    usersService.findByEmail.mockResolvedValue({
-      id: 'mongo-id-demote',
-      username: 'apollo-0000-0001-0000-0001',
-      email: '0000-0001-0000-0001@curatorium.app',
-      role: 'admin',
+    await userModel.create({ username: USERNAME, email: EMAIL, role: 'admin' })
+    Object.assign(userModel.docs[0] ?? {}, {
       lastId1Kid: 'k1',
       lastId1BootId: 'b1',
     })
 
-    const claims = buildInnerClaims({
-      role: 'user',
-      id1_kid: 'k2',
-      id1_boot_id: 'b1',
-    })
-    await service.exchangeCuratoriumToken(signInnerJwt(claims))
-
-    expect(usersService.updateRoleAndTracking).toHaveBeenCalledWith(
-      'mongo-id-demote',
-      'user',
-      'k2',
-      'b1',
+    const result = await service.exchangeCuratoriumToken(
+      signInnerJwt(
+        buildInnerClaims({ role: 'user', id1_kid: 'k2', id1_boot_id: 'b1' }),
+      ),
     )
+
+    expect(userModel.docs[0]).toMatchObject({
+      role: 'user',
+      lastId1Kid: 'k2',
+      lastId1BootId: 'b1',
+    })
+    expect(decode(result.token).role).toBe('user')
   })
 
   it('exchangeCuratoriumToken_doesNotApplyFirstUserAdminFallback', async () => {
     // Empty users collection - what would normally trigger logIn's
     // first-user-becomes-admin fallback
-    usersService.findAll.mockResolvedValue([])
-    usersService.findByEmail.mockResolvedValue(null)
-    let capturedRole: string | undefined
-    usersService.addNew.mockImplementation(async (dto: { role: string }) => {
-      capturedRole = dto.role
-      return {
-        id: 'mongo-id-new',
-        username: 'apollo-0000-0001-0000-0001',
-        email: '0000-0001-0000-0001@curatorium.app',
-        role: dto.role,
-      }
-    })
+    expect(userModel.docs).toHaveLength(0)
 
-    const claims = buildInnerClaims({ role: 'user' })
-    await service.exchangeCuratoriumToken(signInnerJwt(claims))
+    const result = await service.exchangeCuratoriumToken(
+      signInnerJwt(buildInnerClaims({ role: 'user' })),
+    )
 
-    expect(capturedRole).toBe('user')
-    expect(capturedRole).not.toBe(Role.Admin)
-    expect(usersService.findAll).not.toHaveBeenCalled()
+    expect(userModel.docs[0]?.role).toBe('user')
+    expect(userModel.docs[0]?.role).not.toBe(Role.Admin)
+    expect(decode(result.token).role).toBe('user')
   })
 })
