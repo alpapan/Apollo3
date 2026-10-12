@@ -73,6 +73,21 @@ export class UsersService {
     return this.userModel.create(user)
   }
 
+  async updateRoleAndTracking(
+    id: string,
+    role: Role,
+    kid: string,
+    bootId: string,
+  ) {
+    return this.userModel
+      .findByIdAndUpdate(
+        id,
+        { role, lastId1Kid: kid, lastId1BootId: bootId },
+        { new: true },
+      )
+      .exec()
+  }
+
   async getCount() {
     return this.userModel.count().exec()
   }

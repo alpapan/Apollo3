@@ -107,6 +107,10 @@ export class JBrowseService {
         name: 'Apollo',
         url: pluginLocation,
       },
+      {
+        name: 'Primer3Plugin',
+        url: '/jbrowse-plugins/primer3.umd.js',
+      },
     ]
   }
 

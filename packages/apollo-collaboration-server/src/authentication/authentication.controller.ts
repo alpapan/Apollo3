@@ -76,4 +76,9 @@ export class AuthenticationController {
   rootLogin(@Body() { password }: { password: string }) {
     return this.authService.rootLogin(password)
   }
+
+  @Post('exchange')
+  async curatoriumExchange(@Body() { token }: { token: string }) {
+    return this.authService.exchangeCuratoriumToken(token)
+  }
 }

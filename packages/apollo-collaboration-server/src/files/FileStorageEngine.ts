@@ -40,11 +40,17 @@ export class FileStorageEngine implements StorageEngine {
       file.contentEncoding = 'gzip'
     }
 
-    const checksum = await writeFileAndCalculateHash(
-      file,
-      FILE_UPLOAD_FOLDER,
-      this.logger,
-    )
+    let checksum: string
+    try {
+      checksum = await writeFileAndCalculateHash(
+        file,
+        FILE_UPLOAD_FOLDER,
+        this.logger,
+      )
+    } catch (error) {
+      cb(error)
+      return
+    }
 
     cb(null, { ...file, checksum })
   }
