@@ -139,7 +139,13 @@ export function layoutsModelFactory(
                 continue
               }
               for (const [, child] of children) {
-                if (featureTypeOntology.isTypeOf(child.type, 'transcript')) {
+                if (
+                  featureTypeOntology.isTypeOf(child.type, 'transcript') ||
+                  featureTypeOntology.isTypeOf(
+                    child.type,
+                    'pseudogenic_transcript',
+                  )
+                ) {
                   const {
                     cdsLocations,
                     strand,

@@ -77,10 +77,12 @@ export function mouseEventsModelIntermediateFactory(
           foundFeature = layoutRow.find((f) => {
             const { feature } = f
             const featureID = feature.attributes.get('gff_id')?.toString()
-            const isTranscript = featureTypeOntology.isTypeOf(
-              feature.type,
-              'transcript',
-            )
+            const isTranscript =
+              featureTypeOntology.isTypeOf(feature.type, 'transcript') ||
+              featureTypeOntology.isTypeOf(
+                feature.type,
+                'pseudogenic_transcript',
+              )
             if (!isTranscript) {
               return false
             }
