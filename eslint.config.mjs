@@ -15,6 +15,7 @@ export default [
   {
     ignores: [
       '.pnp.*',
+      '.pixi/',
       '.yarn/',
       '**/bin/',
       '**/build/',
@@ -39,7 +40,10 @@ export default [
       globals: { ...globals.browser, ...globals.node },
       parserOptions: { projectService: true },
     },
-    settings: { react: { version: 'detect' } },
+    // Pinned to the react version every package declares (^18.2.0); 'detect' warns
+    // under Yarn PnP because react is not resolvable at the config root. Bump on a
+    // React major upgrade.
+    settings: { react: { version: '18.2' } },
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     plugins: { tsdoc: pluginTSDoc, import: pluginImport },
     rules: {
@@ -128,5 +132,22 @@ export default [
   {
     files: ['packages/apollo-cli/src/**/*.ts'],
     rules: { '@typescript-eslint/no-deprecated': 'off' },
+  },
+  // Jest mocks at the NestJS DI boundary (Mongoose Model, gateway, ConfigService
+  // injected via `useValue`) cannot satisfy strict-type-checked's `no-unsafe-*`
+  // family without ceremony that buries test intent. This override matches the
+  // pattern Apollo3 used pre-strictTypeChecked; it relaxes the noisy rules for
+  // *.spec.ts files only.
+  {
+    files: ['**/*.spec.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-confusing-void-expression': 'off',
+      '@typescript-eslint/require-await': 'off',
+      'unicorn/no-useless-undefined': 'off',
+    },
   },
 ]
