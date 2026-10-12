@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt'
 import { Test, type TestingModule } from '@nestjs/testing'
 import jwt from 'jsonwebtoken'
 
+import { PluginsService } from '../plugins/plugins.service.js'
 import { UsersService } from '../users/users.service.js'
 import { Role } from '../utils/role/role.enum.js'
 
@@ -87,6 +88,7 @@ describe('AuthenticationService', () => {
         { provide: UsersService, useValue: usersService },
         { provide: JwtService, useValue: jwtService },
         { provide: ConfigService, useValue: configService },
+        { provide: PluginsService, useValue: {} },
       ],
     }).compile()
 

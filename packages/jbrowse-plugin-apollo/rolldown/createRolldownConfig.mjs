@@ -1,0 +1,206 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import fs from 'node:fs'
+import path from 'node:path'
+
+import nodePolyfills from '@rolldown/plugin-node-polyfills'
+import nodeBuiltins from 'builtin-modules'
+import { defineConfig } from 'rolldown'
+import rollupExternalGlobals from 'rollup-plugin-external-globals'
+
+import { istanbul } from './istanbulPlugin.mjs'
+import {
+  external,
+  omitUnresolved,
+  safePackageName,
+  writeIndex,
+} from './util.mjs'
+
+const appPath = fs.realpathSync(process.cwd())
+const packageJsonPath = path.join(appPath, 'package.json')
+const packageJsonText = fs.readFileSync(packageJsonPath, 'utf8')
+const packageJson = JSON.parse(packageJsonText)
+const packageName = safePackageName(packageJson.name ?? '')
+const umdName = `JBrowsePlugin${packageJson.config?.jbrowse?.plugin?.name}`
+
+const distPath = path.join(appPath, 'dist')
+const srcPath = path.join(appPath, 'src')
+
+const nodeEnv = process.env.NODE_ENV ?? 'production'
+
+const resolve = {
+  mainFields: ['module', 'main', 'browser'],
+}
+
+function createGlobalMap(jbrowseGlobals, dotSyntax = false) {
+  const globalMap = {}
+  for (const global of jbrowseGlobals) {
+    globalMap[global] = dotSyntax
+      ? `JBrowseExports.${global}`
+      : `JBrowseExports["${global}"]`
+  }
+  return globalMap
+}
+
+function getPlugins(mode, jbrowseGlobals) {
+  return [
+    // Instrument the UMD bundle (the one Cypress loads) for coverage
+    mode === 'umd' && process.env.COVERAGE === 'true' && istanbul({ srcPath }),
+    (mode === 'cjs' || mode === 'esmBundle' || mode === 'umd') &&
+      rollupExternalGlobals(createGlobalMap(jbrowseGlobals)),
+    (mode === 'esmBundle' || mode === 'umd') &&
+      // By default, nodePolyfills only polyfills code in node_modules/. We set
+      // include to null here to include the plugin source code itself (and for
+      // Yarn 2/3 compatibility, since it doesn't use node_modules/).
+      nodePolyfills({ include: null }),
+    (mode === 'cjs' || mode === 'esmBundle') && omitUnresolved(),
+  ].filter(Boolean)
+}
+
+export function createRolldownConfig(jbrowseGlobals, options) {
+  const includeUMD =
+    options?.includeUMD === true || options?.includeUMD === undefined
+  const includeCJS = options?.includeCJS === true
+  const includeESMBundle = options?.includeESMBundle === true
+  const includeNPM =
+    options?.includeNPM === true || options?.includeNPM === undefined
+  const npmConfig =
+    includeNPM &&
+    defineConfig({
+      input: path.join(srcPath, 'index.ts'),
+      external,
+      resolve,
+      treeshake: { propertyReadSideEffects: false },
+      plugins: [writeIndex(packageName, distPath)],
+      output: [
+        {
+          file: path.join(distPath, 'index.esm.js'),
+          format: 'esm',
+          esModule: true,
+          sourcemap: true,
+          exports: 'named',
+          codeSplitting: false,
+        },
+        {
+          file: path.join(distPath, `${packageName}.cjs.development.js`),
+          format: 'cjs',
+          esModule: true,
+          sourcemap: true,
+          exports: 'named',
+          codeSplitting: false,
+        },
+        nodeEnv === 'production' && {
+          file: path.join(distPath, `${packageName}.cjs.production.min.js`),
+          format: 'cjs',
+          esModule: true,
+          sourcemap: true,
+          exports: 'named',
+          minify: true,
+          codeSplitting: false,
+        },
+      ].filter(Boolean),
+    })
+  const umdConfig =
+    includeUMD &&
+    defineConfig({
+      input: path.join(srcPath, 'index.ts'),
+      external: (id) => {
+        const isExternal = external(id)
+        if (isExternal && !jbrowseGlobals.includes(id)) {
+          return false
+        }
+        return isExternal
+      },
+      resolve,
+      treeshake: { propertyReadSideEffects: false },
+      plugins: getPlugins('umd', jbrowseGlobals),
+      output: [
+        {
+          file: path.join(distPath, `${packageName}.umd.development.js`),
+          format: 'umd',
+          name: umdName,
+          esModule: true,
+          sourcemap: true,
+          exports: 'named',
+          codeSplitting: false,
+          globals: createGlobalMap(jbrowseGlobals, true),
+        },
+        nodeEnv === 'production' && {
+          file: path.join(distPath, `${packageName}.umd.production.min.js`),
+          format: 'umd',
+          name: umdName,
+          esModule: true,
+          sourcemap: true,
+          exports: 'named',
+          codeSplitting: false,
+          globals: createGlobalMap(jbrowseGlobals, true),
+          minify: true,
+        },
+      ].filter(Boolean),
+      watch: { clearScreen: false },
+    })
+  const esmBundleConfig =
+    includeESMBundle &&
+    defineConfig({
+      input: path.join(srcPath, 'index.ts'),
+      external: (id) => {
+        const isExternal = external(id)
+        if (isExternal && !jbrowseGlobals.includes(id)) {
+          return false
+        }
+        return isExternal
+      },
+      resolve,
+      treeshake: { propertyReadSideEffects: false, moduleSideEffects: false },
+      plugins: getPlugins('esmBundle', jbrowseGlobals),
+      output: [
+        {
+          file: path.join(distPath, `${packageName}.esm.js`),
+          format: 'esm',
+          esModule: true,
+          sourcemap: true,
+          exports: 'named',
+          codeSplitting: false,
+        },
+      ],
+      watch: { clearScreen: false },
+    })
+  const cjsConfig =
+    includeCJS &&
+    defineConfig({
+      input: path.join(srcPath, 'index.ts'),
+      external: (id) => {
+        if (nodeBuiltins.includes(id)) {
+          return true
+        }
+        const isExternal = external(id)
+        if (isExternal && !jbrowseGlobals.includes(id)) {
+          return false
+        }
+        return isExternal
+      },
+      resolve,
+      treeshake: { propertyReadSideEffects: false, moduleSideEffects: false },
+      plugins: getPlugins('cjs', jbrowseGlobals),
+      output: [
+        {
+          file: path.join(distPath, `${packageName}.cjs.js`),
+          format: 'cjs',
+          esModule: true,
+          sourcemap: true,
+          exports: 'named',
+          codeSplitting: false,
+        },
+      ],
+      watch: { clearScreen: false },
+    })
+  const configs = []
+  for (const conf of [umdConfig, esmBundleConfig, npmConfig, cjsConfig]) {
+    if (conf) {
+      configs.push(conf)
+    }
+  }
+  return defineConfig(configs)
+}

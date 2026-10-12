@@ -36,12 +36,6 @@ import { FeaturesService } from './features.service.js'
           }
           FeatureSchema.post('save', runChecksOnDocument)
           FeatureSchema.post('updateOne', runChecksOnDocument)
-          FeatureSchema.post('update', async function () {
-            const features = await this.model.find<FeatureDocument>(
-              this.getQuery(),
-            )
-            await runChecksOnDocuments(features)
-          })
           FeatureSchema.post('findOneAndUpdate', async function () {
             const features = await this.model.find<FeatureDocument>(
               this.getQuery(),
@@ -50,7 +44,7 @@ import { FeaturesService } from './features.service.js'
           })
           FeatureSchema.post('updateMany', async function () {
             const query = this.getQuery()
-            if (query.$and && query.$and[0]) {
+            if (query.$and?.[0]) {
               delete query.$and[0].status
             }
             const features = await this.model.find<FeatureDocument>(query)

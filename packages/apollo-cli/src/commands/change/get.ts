@@ -1,8 +1,7 @@
 import { Flags } from '@oclif/core'
-import type { Response } from 'undici'
 
 import { BaseCommand } from '../../baseCommand.js'
-import { convertAssemblyNameToId, idReader, queryApollo } from '../../utils.js'
+import { idReader } from '../../utils.js'
 
 export default class Get extends BaseCommand<typeof Get> {
   static summary = 'Get list of changes'
@@ -24,25 +23,14 @@ In such cases you need to use the assembly ID.'
   public async run(): Promise<void> {
     const { flags } = await this.parse(Get)
 
-    const access = await this.getAccess()
+    const { changes } = (await this.get('changes')) as { changes: object[] }
 
-    const changes: Response = await queryApollo(
-      access.address,
-      access.accessToken,
-      'changes',
-    )
-    const json = (await changes.json()) as object[]
-
-    let keep = json
+    let keep = changes
     if (flags.assembly !== undefined) {
       keep = []
       const assembly = await idReader(flags.assembly)
-      const assemblyIds = await convertAssemblyNameToId(
-        access.address,
-        access.accessToken,
-        assembly,
-      )
-      for (const x of json) {
+      const assemblyIds = await this.convertAssemblyNameToId(assembly)
+      for (const x of changes) {
         if (assemblyIds.includes(x['assembly' as keyof typeof x])) {
           keep.push(x)
         }

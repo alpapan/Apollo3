@@ -1,10 +1,4 @@
-import { User as UserSchema } from '@apollo-annotation/schemas'
-import { jest } from '@jest/globals'
-import { ConfigService } from '@nestjs/config'
-import { getModelToken } from '@nestjs/mongoose'
 import { Test, type TestingModule } from '@nestjs/testing'
-
-import { MessagesGateway } from '../messages/messages.gateway.js'
 
 import { UsersController } from './users.controller.js'
 import { UsersService } from './users.service.js'
@@ -13,26 +7,9 @@ describe('UsersController', () => {
   let controller: UsersController
 
   beforeEach(async () => {
-    const userModel = {
-      find: jest.fn(),
-      findById: jest.fn(),
-      findOne: jest.fn(),
-      findByIdAndUpdate: jest.fn<() => unknown>().mockReturnValue({
-        exec: jest.fn<() => Promise<unknown>>().mockResolvedValue({}),
-      }),
-      countDocuments: jest.fn<() => unknown>().mockReturnValue({
-        exec: jest.fn<() => Promise<unknown>>().mockResolvedValue(0),
-      }),
-    }
-
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
-      providers: [
-        UsersService,
-        { provide: getModelToken(UserSchema.name), useValue: userModel },
-        { provide: MessagesGateway, useValue: { create: jest.fn() } },
-        { provide: ConfigService, useValue: { get: jest.fn() } },
-      ],
+      providers: [{ provide: UsersService, useValue: {} }],
     }).compile()
 
     controller = module.get<UsersController>(UsersController)

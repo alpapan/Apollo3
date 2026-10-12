@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unnecessary-condition */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { changeRegistry, checkRegistry } from '@apollo-annotation/common'
@@ -78,8 +77,10 @@ import { addTopLevelMenus } from './menus'
 import { type ApolloSessionModel, extendSession } from './session'
 
 interface RpcHandle {
-  on(event: string, listener: (event: MessageEvent) => void): this
-  workers: Worker[]
+  client: {
+    on?(event: string, listener: (event: MessageEvent) => void): void
+  }
+  worker: Worker
 }
 
 interface ApolloMessageData {
@@ -89,6 +90,12 @@ interface ApolloMessageData {
   region: Region
   sequence: string
   assembly: string
+}
+
+interface JBrowseTrackConfig {
+  trackId: string
+  type: string
+  displays?: { type: string; displayId: string }[]
 }
 
 function isApolloMessageData(data?: unknown): data is ApolloMessageData {
@@ -118,7 +125,8 @@ validationRegistry.registerValidation(new ParentChildValidation())
 export default class ApolloPlugin extends Plugin {
   name = 'ApolloPlugin'
   version = version
-  configurationSchema = ApolloPluginConfigurationSchema
+  configurationSchema: ReturnType<typeof ConfigurationSchema> =
+    ApolloPluginConfigurationSchema
 
   install(pluginManager: PluginManager) {
     installApolloSequenceAdapter(pluginManager)
@@ -289,6 +297,43 @@ export default class ApolloPlugin extends Plugin {
     )
 
     pluginManager.addToExtensionPoint(
+      'Core-preProcessTrackConfig',
+      (snap: JBrowseTrackConfig): JBrowseTrackConfig => {
+        if (snap.type !== 'ReferenceSequenceTrack') {
+          return snap
+        }
+        const displays = snap.displays ?? []
+        const apolloDisplayIdx = displays.findIndex(
+          (d) => d.type === 'LinearApolloReferenceSequenceDisplay',
+        )
+        if (apolloDisplayIdx === 0) {
+          return snap
+        }
+        if (apolloDisplayIdx === -1) {
+          return {
+            ...snap,
+            displays: [
+              {
+                type: 'LinearApolloReferenceSequenceDisplay',
+                displayId: `${snap.trackId}-LinearApolloReferenceSequenceDisplay`,
+              },
+              ...displays,
+            ],
+          }
+        }
+        const reorderedDisplays = displays.toSpliced(apolloDisplayIdx, 1)
+        reorderedDisplays.unshift({
+          type: 'LinearApolloReferenceSequenceDisplay',
+          displayId: `${snap.trackId}-LinearApolloReferenceSequenceDisplay`,
+        })
+        return {
+          ...snap,
+          displays: reorderedDisplays,
+        }
+      },
+    )
+
+    pluginManager.addToExtensionPoint(
       'LinearGenomeView-searchResultSelected',
       (_: any, props: Record<string, unknown>) => {
         const { session, result } = props as {
@@ -312,10 +357,10 @@ export default class ApolloPlugin extends Plugin {
       pluginManager.addToExtensionPoint(
         'Core-extendWorker',
         (handle: RpcHandle) => {
-          if (!('on' in handle && handle.on)) {
+          if (!('on' in handle.client && handle.client.on)) {
             return handle
           }
-          handle.on('apollo', async (event: MessageEvent) => {
+          handle.client.on('apollo', async (event: MessageEvent) => {
             if (!isApolloMessageData(event)) {
               return
             }
@@ -338,7 +383,7 @@ export default class ApolloPlugin extends Plugin {
                 }
                 const { seq: sequence } =
                   await backendDriver.getSequence(region)
-                handle.workers[0].postMessage({
+                handle.worker.postMessage({
                   apollo,
                   messageId,
                   sequence,
@@ -360,7 +405,7 @@ export default class ApolloPlugin extends Plugin {
                   break
                 }
                 const regions = await backendDriver.getRegions(assembly)
-                handle.workers[0].postMessage({
+                handle.worker.postMessage({
                   apollo,
                   messageId,
                   regions,
@@ -383,7 +428,7 @@ export default class ApolloPlugin extends Plugin {
                 }
                 const refNameAliases =
                   await backendDriver.getRefNameAliases(assembly)
-                handle.workers[0].postMessage({
+                handle.worker.postMessage({
                   apollo,
                   messageId,
                   refNameAliases,

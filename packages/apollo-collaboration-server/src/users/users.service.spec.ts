@@ -51,7 +51,7 @@ describe('UsersService', () => {
     expect(findByIdAndUpdateSpy).toHaveBeenCalledWith(
       'user-id-1',
       { role: 'admin', lastId1Kid: 'kid-A', lastId1BootId: 'boot-X' },
-      { new: true },
+      { returnDocument: 'after' },
     )
     expect(execSpy).toHaveBeenCalled()
   })

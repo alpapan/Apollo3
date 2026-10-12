@@ -5,6 +5,7 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import type { AnnotationFeature } from '@apollo-annotation/mst'
 import type PluginManager from '@jbrowse/core/PluginManager'
+import type { Assembly } from '@jbrowse/core/assemblyManager/assembly'
 import {
   type AnyConfigurationSchemaType,
   ConfigurationReference,
@@ -13,6 +14,7 @@ import {
 import { BaseDisplay } from '@jbrowse/core/pluggableElementTypes'
 import {
   type AbstractSessionModel,
+  type Region,
   getContainingView,
   getSession,
 } from '@jbrowse/core/util'
@@ -84,20 +86,39 @@ export function baseModelFactory(
         return regions
       },
       regionCannotBeRendered(/* region */) {
-        if (self.lgv && self.lgv.bpPerPx >= 3) {
+        if (self.lgv && self.lgv.bpPerPx > 3) {
           return 'Zoom in to see sequence'
         }
         return
       },
     }))
     .views((self) => ({
+      get expandedRegions() {
+        const regions = self.lgv.dynamicBlocks.contentBlocks.map((block) => {
+          const { assemblyName, end, refName, start } = block
+          const { parentRegion } = block as unknown as { parentRegion: Region }
+          const expandedStart = Math.round(
+            Math.max(start - 5, parentRegion.start),
+          )
+          const expandedEnd = Math.round(Math.min(end + 5, parentRegion.end))
+          return {
+            assemblyName,
+            refName,
+            start: expandedStart,
+            end: expandedEnd,
+          }
+        })
+        return regions
+      },
       get apolloInternetAccount() {
         const [region] = self.regions
         const { internetAccounts } = getRoot<ApolloRootModel>(self)
         const { assemblyName } = region
         const { assemblyManager } =
           self.session as unknown as AbstractSessionModel
-        const assembly = assemblyManager.get(assemblyName)
+        const assembly = assemblyManager.get(assemblyName) as
+          | Assembly
+          | undefined
         if (!assembly) {
           throw new Error(`No assembly found with name ${assemblyName}`)
         }
@@ -110,8 +131,7 @@ export function baseModelFactory(
         ) as ApolloInternetAccountModel | undefined
       },
       get changeManager() {
-        return (self.session as unknown as ApolloSessionModel).apolloDataStore
-          .changeManager
+        return self.session.apolloDataStore.changeManager
       },
       getAssemblyId(assemblyName: string) {
         const { assemblyManager } =
@@ -123,12 +143,10 @@ export function baseModelFactory(
         return assembly.name
       },
       get selectedFeature(): AnnotationFeature | undefined {
-        return (self.session as unknown as ApolloSessionModel)
-          .apolloSelectedFeature
+        return self.session.apolloSelectedFeature
       },
       get hoveredFeature(): HoveredFeature | undefined {
-        return (self.session as unknown as ApolloSessionModel)
-          .apolloHoveredFeature
+        return self.session.apolloHoveredFeature
       },
       get height() {
         const { sequenceRowHeight } = self
@@ -214,9 +232,9 @@ export function baseModelFactory(
                 return
               }
               if (self.lgv.bpPerPx <= 3) {
-                void (
-                  self.session as unknown as ApolloSessionModel
-                ).apolloDataStore.loadRefSeq(self.regions)
+                void self.session.apolloDataStore.loadRefSeq(
+                  self.expandedRegions,
+                )
               }
             },
             {

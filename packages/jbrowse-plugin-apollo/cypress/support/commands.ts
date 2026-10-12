@@ -2,17 +2,34 @@ import { type IDBPDatabase, openDB } from 'idb'
 
 Cypress.Commands.add('loginAsGuest', () => {
   cy.visit('/?config=http://localhost:3999/jbrowse/config.json')
-  cy.contains('Continue as Guest', { timeout: 10_000 }).click()
-  // eslint-disable-next-line cypress/no-unnecessary-waiting
-  cy.wait(2000)
-  cy.reload()
+  // The login dialog doesn't always appear (e.g. in CI), so poll for it for a
+  // few seconds and continue on if it never shows up
+  const deadline = Date.now() + 2000
+  function clickGuestLoginIfPresent() {
+    cy.get('body').then(($body) => {
+      const guestLogin = $body.find(':contains("Continue as Guest")').last()
+      if (guestLogin.length > 0) {
+        cy.wrap(guestLogin).click()
+        // eslint-disable-next-line cypress/no-unnecessary-waiting
+        cy.wait(2000)
+        cy.reload()
+        return
+      }
+      if (Date.now() < deadline) {
+        // eslint-disable-next-line cypress/no-unnecessary-waiting
+        cy.wait(250)
+        clickGuestLoginIfPresent()
+      }
+    })
+  }
+  clickGuestLoginIfPresent()
 })
 
 Cypress.Commands.add('deleteAssemblies', () => {
   for (const x of ['assemblies', 'features']) {
     cy.log(x)
     cy.deleteMany({}, { collection: x }).then((results: undefined) => {
-      cy.log(`Collection ${x}: ${results}` as unknown as string)
+      cy.log(`Collection ${x}: ${results}`)
     })
   }
 })
@@ -20,7 +37,7 @@ Cypress.Commands.add('deleteAssemblies', () => {
 type OntologyKey = 'nodes' | 'edges' | 'meta'
 
 async function loadOntology(
-  ontologyGZip: Buffer,
+  ontologyGZip: ArrayBuffer,
   name: string,
   version: number,
 ) {
@@ -41,6 +58,7 @@ async function loadOntology(
     Object.entries(ontologyData.meta[0].storeOptions.prefixes),
   )
   await openDB(name, version, {
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     async upgrade(database: IDBPDatabase): Promise<void> {
       const meta = database.createObjectStore('meta')
       await meta.add(ontologyData.meta[0], 'meta')
@@ -88,7 +106,7 @@ Cypress.Commands.add('addOntologies', () => {
   )
   // so.json.gz was generated from an IndexedDB dump using the script found at
   // https://gist.github.com/loilo/ed43739361ec718129a15ae5d531095b
-  cy.readFile('cypress/data/so.json.gz', null).then((soGZip: Buffer) => {
+  cy.readFile<ArrayBuffer>('cypress/data/so.json.gz', null).then((soGZip) => {
     cy.wrap<Promise<void>>(
       loadOntology(
         soGZip,

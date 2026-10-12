@@ -1,11 +1,11 @@
+/* eslint-disable @eslint-react/set-state-in-effect */
+/* eslint-disable @eslint-react/static-components */
 import type { AnnotationFeature } from '@apollo-annotation/mst'
-import styled from '@emotion/styled'
 import {
   type AbstractSessionModel,
   getEnv,
   getSession,
 } from '@jbrowse/core/util'
-import { makeStyles } from '@jbrowse/core/util/tss-react'
 import { getRoot } from '@jbrowse/mobx-state-tree'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import InfoIcon from '@mui/icons-material/Info'
@@ -16,8 +16,10 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
+import { styled } from '@mui/material/styles'
 import { observer } from 'mobx-react'
 import React, { useEffect, useState } from 'react'
+import { makeStyles } from 'tss-react/mui'
 
 import type { ApolloInternetAccountModel } from '../ApolloInternetAccount/model'
 import type { ApolloSessionModel } from '../session'
@@ -66,10 +68,10 @@ export const ApolloTranscriptDetailsWidget = observer(
 
     useEffect(() => {
       setPanelState(DEFAULT_PANELS)
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line @eslint-react/exhaustive-deps
     }, [feature])
 
-    const session = getSession(model) as unknown as AbstractSessionModel
+    const session = getSession(model)
     const { pluginManager } = getEnv(session)
     const apolloSession = getSession(model) as unknown as ApolloSessionModel
     const currentAssembly =

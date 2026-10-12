@@ -12,6 +12,7 @@ import {
   CheckResult,
   type CheckResultSnapshot,
 } from '@apollo-annotation/mst'
+import type { Assembly } from '@jbrowse/core/assemblyManager/assembly'
 import {
   type AnyConfigurationModel,
   getConf,
@@ -106,7 +107,9 @@ export function clientDataStoreFactory(
         let ref = apolloAssembly.refSeqs.get(feature.refSeq)
         if (!ref) {
           // maybe it's a valid refName that we haven't loaded yet
-          const assembly = assemblyManager.get(assemblyId)
+          const assembly = assemblyManager.get(assemblyId) as
+            | Assembly
+            | undefined
           if (!assembly) {
             throw new Error(
               `Could not find assembly "${assemblyId}" to add feature "${feature._id}"`,
@@ -119,6 +122,9 @@ export function clientDataStoreFactory(
             )
           }
           ref = apolloAssembly.addRefSeq(feature.refSeq, canonicalRefName)
+        }
+        if (!ref) {
+          throw new Error(`Could not find or create refSeq "${feature.refSeq}"`)
         }
         ref.features.put(feature)
       },
@@ -291,19 +297,17 @@ export function clientDataStoreFactory(
             continue
           }
           const { assemblyName, refName } = region
-          let assembly = self.assemblies.get(assemblyName)
-          if (!assembly) {
-            assembly = self.assemblies.put({ _id: assemblyName, refSeqs: {} })
-          }
+          const assembly =
+            self.assemblies.get(assemblyName) ??
+            self.assemblies.put({ _id: assemblyName, refSeqs: {} })
           const [firstFeature] = features
-          let ref = assembly.refSeqs.get(firstFeature.refSeq)
-          if (!ref) {
-            ref = assembly.refSeqs.put({
+          const ref =
+            assembly.refSeqs.get(firstFeature.refSeq) ??
+            assembly.refSeqs.put({
               _id: firstFeature.refSeq,
               name: refName,
               features: {},
             })
-          }
           for (const feature of features) {
             if (!ref.features.has(feature._id)) {
               ref.features.put(feature)
@@ -320,18 +324,12 @@ export function clientDataStoreFactory(
           }
           const { refSeq, seq } = yield backendDriver.getSequence(region)
           const { assemblyName, end, refName, start } = region
-          let assembly = self.assemblies.get(assemblyName)
-          if (!assembly) {
-            assembly = self.assemblies.put({ _id: assemblyName, refSeqs: {} })
-          }
-          let ref = assembly.refSeqs.get(refSeq)
-          if (!ref) {
-            ref = assembly.refSeqs.put({
-              _id: refSeq,
-              name: refName,
-              sequence: [],
-            })
-          }
+          const assembly =
+            self.assemblies.get(assemblyName) ??
+            self.assemblies.put({ _id: assemblyName, refSeqs: {} })
+          const ref =
+            assembly.refSeqs.get(refSeq) ??
+            assembly.refSeqs.put({ _id: refSeq, name: refName, sequence: [] })
           ref.addSequence({ start, stop: end, sequence: seq })
         }
       }),

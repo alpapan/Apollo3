@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { annotationFeatureToGFF3 } from '@apollo-annotation/shared'
 import { GFFFormattingTransformer } from '@gmod/gff'
+import type { Assembly } from '@jbrowse/core/assemblyManager/assembly'
 import { getConf } from '@jbrowse/core/configuration'
 import type { AbstractSessionModel } from '@jbrowse/core/util'
 import {
@@ -49,7 +50,7 @@ export function DownloadGFF3({
   session,
   assembly: assemblyName,
 }: DownloadGFF3Props) {
-  const [includeFASTA, setincludeFASTA] = useState(false)
+  const [includeFASTA, setIncludeFASTA] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
   const { getInternetAccount } = session.apolloDataStore as {
@@ -61,7 +62,7 @@ export function DownloadGFF3({
   }
 
   const { assemblyManager } = session as unknown as AbstractSessionModel
-  const assembly = assemblyManager.get(assemblyName)
+  const assembly = assemblyManager.get(assemblyName) as Assembly | undefined
   if (!assembly) {
     setErrorMessage(`Assembly "${assemblyName}" not found`)
     return
@@ -140,7 +141,7 @@ export function DownloadGFF3({
                 <Checkbox
                   checked={includeFASTA}
                   onChange={() => {
-                    setincludeFASTA(!includeFASTA)
+                    setIncludeFASTA(!includeFASTA)
                   }}
                   disabled={!internetAccountConfigId}
                 />

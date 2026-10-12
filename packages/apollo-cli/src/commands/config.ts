@@ -1,13 +1,16 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import path from 'node:path'
 
-import input from '@inquirer/input'
-import password from '@inquirer/password'
-import select from '@inquirer/select'
+import { input, password, select } from '@inquirer/prompts'
 import { Args, Flags } from '@oclif/core'
 import { fetch } from 'undici'
 
-import { ApolloConf, KEYS, optionDesc } from '../ApolloConf.js'
+import {
+  type ApolloConf,
+  ConfigError,
+  KEYS,
+  optionDesc,
+} from '../ApolloConf.js'
 import { BaseCommand } from '../baseCommand.js'
 import { createFetchErrorMessage, localhostToAddress } from '../utils.js'
 
@@ -68,19 +71,21 @@ export default class ApolloConfig extends BaseCommand<typeof ApolloConfig> {
       return
     }
 
-    const config: ApolloConf = new ApolloConf(configFile)
+    const config = this.getConfig()
 
     if (args.key === undefined) {
       await this.interactiveSetup(config, flags.profile)
     } else {
-      let profileName = flags.profile
-      if (profileName === undefined) {
-        profileName = process.env.APOLLO_PROFILE ?? 'default'
-      }
+      let profileName = flags.profile ?? process.env.APOLLO_PROFILE ?? 'default'
       if (flags.profile !== undefined) {
         profileName = flags.profile
       }
       if (args.value === undefined) {
+        if (!config.getProfileNames().includes(profileName)) {
+          throw new ConfigError(
+            `Profile "${profileName}" does not exist. Please run "apollo config" to set this profile up or choose a different profile`,
+          )
+        }
         const currentValue: string = config.get(
           `${profileName}.${args.key}`,
         ) as string
@@ -99,9 +104,7 @@ export default class ApolloConfig extends BaseCommand<typeof ApolloConfig> {
     config: ApolloConf,
     profileName: string | undefined,
   ) {
-    if (profileName === undefined) {
-      profileName = await this.askProfileName(config.getProfileNames())
-    }
+    profileName ??= await this.askProfileName(config.getProfileNames())
 
     let setMe = true
     while (setMe) {
@@ -114,8 +117,7 @@ export default class ApolloConfig extends BaseCommand<typeof ApolloConfig> {
     const address: string = config.get(
       `${profileName}.${KEYS[KEYS.address]}`,
     ) as string
-    let accessType = ''
-    accessType = await this.selectAccessType(address)
+    const accessType = await this.selectAccessType(address)
 
     config.setAccessType(profileName, accessType)
     if (accessType === 'root') {
@@ -127,16 +129,11 @@ export default class ApolloConfig extends BaseCommand<typeof ApolloConfig> {
   private async askProfileName(currentProfiles: string[]): Promise<string> {
     const newProfile = '<New profile>'
     currentProfiles.push(newProfile)
-    const xchoices = []
-    for (const profileName of currentProfiles) {
-      xchoices.push({ name: profileName, value: profileName })
-    }
+    const choices = currentProfiles.map((p) => ({ name: p, value: p }))
+    const message = 'Select profile to edit or create a new one:'
     let answer = newProfile
     if (currentProfiles.length > 1) {
-      answer = await select({
-        message: 'Select profile to edit or create a new one:',
-        choices: xchoices,
-      })
+      answer = await select({ message, choices })
     }
     if (answer === newProfile) {
       answer = await input({
@@ -186,19 +183,18 @@ export default class ApolloConfig extends BaseCommand<typeof ApolloConfig> {
   }
 
   private async selectAccessType(address: string): Promise<string> {
-    const xchoices = [{ name: 'root', value: 'root' }]
-    const types: string[] = await this.getLoginTypes(address)
+    const choices = [{ name: 'root', value: 'root' }]
+    const types = await this.getLoginTypes(address)
     for (const type of types) {
-      xchoices.push({ name: type, value: type })
+      choices.push({ name: type.name, value: type.name })
     }
-    const answer = await select({
-      message: 'Select login type',
-      choices: xchoices,
-    })
+    const answer = await select({ message: 'Select login type', choices })
     return answer
   }
 
-  private async getLoginTypes(address: string): Promise<string[]> {
+  private async getLoginTypes(
+    address: string,
+  ): Promise<{ name: string; needsPopup: boolean; message: string }[]> {
     const response = await fetch(localhostToAddress(`${address}/auth/types`))
     if (!response.ok) {
       const errorMessage = await createFetchErrorMessage(

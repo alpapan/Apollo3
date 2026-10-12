@@ -2,7 +2,6 @@ import type {
   AnnotationFeature,
   TranscriptPartCoding,
 } from '@apollo-annotation/mst'
-import type { BaseDisplayModel } from '@jbrowse/core/pluggableElementTypes'
 import type { MenuItem } from '@jbrowse/core/ui'
 import {
   type AbstractSessionModel,
@@ -473,7 +472,7 @@ function drawDragPreview(
   overlayCtx.fillRect(rectX, rectY, rectWidth, rectHeight)
 }
 
-function drawHover(
+function drawOverlay(
   stateModel: LinearApolloSixFrameDisplay,
   ctx: CanvasRenderingContext2D,
 ) {
@@ -865,7 +864,7 @@ function getContextMenuItems(
     session,
   } = display
   const [region] = regions
-  const currentAssemblyId = display.getAssemblyId(region.assemblyName)
+  const currentAssemblyId = display.getAssemblyId(region.assemblyName) as string
   const menuItems: MenuItem[] = []
   const role = internetAccount ? internetAccount.role : 'admin'
   const readOnly = !(role && ['admin', 'user'].includes(role))
@@ -897,7 +896,7 @@ function getContextMenuItems(
       if (isExonFeature(feature, session)) {
         const adjacentExons = getAdjacentExons(feature, display)
         const lgv = getContainingView(
-          display as BaseDisplayModel,
+          display,
         ) as unknown as LinearGenomeViewModel
         if (adjacentExons.upstream) {
           const exon = adjacentExons.upstream
@@ -1018,7 +1017,7 @@ function onMouseLeave(): void {
 export const geneGlyph: Glyph = {
   draw,
   drawDragPreview,
-  drawHover,
+  drawOverlay,
   drawTooltip,
   getContextMenuItems,
   getContextMenuItemsForFeature,

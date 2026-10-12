@@ -10,13 +10,14 @@ Get list of users
 
 ```
 USAGE
-  $ apollo user get [--profile <value>] [--config-file <value>] [-u <value>] [-r <value>]
+  $ apollo user get [--profile <value>] [--config-file <value>] [--timeout <value>] [-u <value>] [-r <value>]
 
 FLAGS
   -r, --role=<value>         Get users with this role
   -u, --username=<value>     Find this username
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get list of users
@@ -38,4 +39,4 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/user/get.ts](https://github.com/GMOD/Apollo3/blob/v0.3.11/packages/apollo-cli/src/commands/user/get.ts)_
+[src/commands/user/get.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/user/get.ts)_

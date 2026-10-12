@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import fs from 'node:fs/promises'
 
 import type { JWTPayload } from '@apollo-annotation/shared'
@@ -11,9 +10,10 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
-import type { Request } from 'express'
+import type { Request, Response } from 'express'
 import type { Profile as GoogleProfile } from 'passport-google-oauth20'
 
+import { PluginsService } from '../plugins/plugins.service.js'
 import { CreateUserDto } from '../users/dto/create-user.dto.js'
 import { UsersService } from '../users/users.service.js'
 import {
@@ -61,6 +61,24 @@ interface InnerJwtPayload {
 
 const ROOT_USER_NAME = 'root'
 
+export interface AuthHandlerRedirect {
+  url: string
+}
+
+export interface AuthHandlerUser {
+  name: string
+  email: string
+}
+
+export interface CustomAuthHandler {
+  message: string
+  needsPopup: boolean
+  handler: (
+    request: Request,
+    redirectUri?: string,
+  ) => Promise<AuthHandlerRedirect | AuthHandlerUser>
+}
+
 @Injectable()
 export class AuthenticationService {
   private readonly logger = new Logger(AuthenticationService.name)
@@ -70,6 +88,7 @@ export class AuthenticationService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService<ConfigValues, true>,
+    private readonly pluginsService: PluginsService,
   ) {
     this.defaultNewUserRole = configService.get('DEFAULT_NEW_USER_ROLE', {
       infer: true,
@@ -91,7 +110,16 @@ export class AuthenticationService {
   }
 
   async getLoginTypes() {
-    const loginTypes: string[] = []
+    const defaultAuthTypes = new Map<string, CustomAuthHandler>()
+    const customAuthTypes = this.pluginsService.evaluateExtensionPoint(
+      'Apollo-RegisterCustomAuth',
+      defaultAuthTypes,
+    )
+    const loginTypes: { name: string; needsPopup: boolean; message: string }[] =
+      []
+    for (const [name, { needsPopup, message }] of customAuthTypes) {
+      loginTypes.push({ name, message, needsPopup })
+    }
     let microsoftClientID = this.configService.get('MICROSOFT_CLIENT_ID', {
       infer: true,
     })
@@ -101,7 +129,7 @@ export class AuthenticationService {
       })
       microsoftClientID =
         clientIDFile && (await fs.readFile(clientIDFile, 'utf8'))
-      microsoftClientID = clientIDFile?.trim()
+      microsoftClientID = microsoftClientID?.trim()
     }
     let googleClientID = this.configService.get('GOOGLE_CLIENT_ID', {
       infer: true,
@@ -111,19 +139,31 @@ export class AuthenticationService {
         infer: true,
       })
       googleClientID = clientIDFile && (await fs.readFile(clientIDFile, 'utf8'))
-      googleClientID = clientIDFile?.trim()
+      googleClientID = googleClientID?.trim()
     }
     const allowGuestUser = this.configService.get('ALLOW_GUEST_USER', {
       infer: true,
     })
     if (microsoftClientID) {
-      loginTypes.push('microsoft')
+      loginTypes.push({
+        name: 'microsoft',
+        message: 'Sign in with Microsoft',
+        needsPopup: true,
+      })
     }
     if (googleClientID) {
-      loginTypes.push('google')
+      loginTypes.push({
+        name: 'google',
+        message: 'Sign in with Google',
+        needsPopup: true,
+      })
     }
     if (allowGuestUser) {
-      loginTypes.push('guest')
+      loginTypes.push({
+        name: 'guest',
+        message: 'Continue as Guest',
+        needsPopup: false,
+      })
     }
     return loginTypes
   }
@@ -169,6 +209,48 @@ export class AuthenticationService {
     throw new UnauthorizedException('Guest users are not allowed')
   }
 
+  async fallbackLogin(
+    id: string,
+    request: Request,
+    response: Response,
+    redirectUri?: string,
+    state?: string,
+  ) {
+    const defaultAuthTypes = new Map<string, CustomAuthHandler>()
+    const customAuthTypes = this.pluginsService.evaluateExtensionPoint(
+      'Apollo-RegisterCustomAuth',
+      defaultAuthTypes,
+    )
+    const customAuth = customAuthTypes.get(id)
+    if (!customAuth) {
+      throw new UnauthorizedException('Unknown authentication type')
+    }
+    let result: AuthHandlerRedirect | AuthHandlerUser
+    try {
+      result = await customAuth.handler(request, redirectUri)
+    } catch (error) {
+      throw new UnauthorizedException(error)
+    }
+    if ('url' in result) {
+      response.redirect(result.url)
+      return result
+    }
+    if ('name' in result && 'email' in result) {
+      const logInResult = await this.logIn(result.name, result.email)
+      if (customAuth.needsPopup && state) {
+        const { redirect_uri } = JSON.parse(state) as { redirect_uri: string }
+        const url = new URL(redirect_uri)
+        const searchParams = new URLSearchParams({
+          access_token: logInResult.token,
+        })
+        url.search = searchParams.toString()
+        response.redirect(url.toString())
+      }
+      return logInResult
+    }
+    throw new UnauthorizedException('Malformed authentication handler response')
+  }
+
   async rootLogin(password: string) {
     if (password === this.configService.get('ROOT_USER_PASSWORD')) {
       return this.logIn(ROOT_USER_NAME, ROOT_USER_EMAIL)
@@ -186,7 +268,7 @@ export class AuthenticationService {
     // Find user from Mongo
     let user = await this.usersService.findByEmail(email)
     if (!user) {
-      let newUserRole = this.defaultNewUserRole
+      let newUserRole
       const isRootUser = name === ROOT_USER_NAME && email === ROOT_USER_EMAIL
       if (isRootUser) {
         newUserRole = Role.Admin
@@ -194,6 +276,7 @@ export class AuthenticationService {
         const users = await this.usersService.findAll()
         const hasAdmin = users.some(
           (user) =>
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
             user.role === Role.Admin &&
             user.email !== 'root_user' &&
             user.email !== 'guest_user',
@@ -217,7 +300,7 @@ export class AuthenticationService {
       username: user.username,
       email: user.email,
       role: user.role as Role,
-      id: user.id as string,
+      id: user.id,
     })
   }
 
@@ -299,7 +382,7 @@ export class AuthenticationService {
         user.lastId1BootId !== payload.id1_boot_id
       if (shouldResync) {
         const updated = await this.usersService.updateRoleAndTracking(
-          user.id as string,
+          user.id,
           role,
           payload.id1_kid,
           payload.id1_boot_id,
@@ -330,7 +413,7 @@ export class AuthenticationService {
         }
       }
       await this.usersService.updateRoleAndTracking(
-        user.id as string,
+        user.id,
         role,
         payload.id1_kid,
         payload.id1_boot_id,
@@ -347,7 +430,7 @@ export class AuthenticationService {
         username: user.username,
         email: user.email,
         role: user.role as Role,
-        id: user.id as string,
+        id: user.id,
       },
       { expSeconds },
     )

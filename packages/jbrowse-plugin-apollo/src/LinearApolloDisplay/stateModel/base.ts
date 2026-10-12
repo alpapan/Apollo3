@@ -5,6 +5,7 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import type { AnnotationFeature } from '@apollo-annotation/mst'
 import type PluginManager from '@jbrowse/core/PluginManager'
+import type { Assembly } from '@jbrowse/core/assemblyManager/assembly'
 import {
   type AnyConfigurationSchemaType,
   ConfigurationReference,
@@ -28,15 +29,18 @@ import {
 } from '@jbrowse/mobx-state-tree'
 import type { LinearGenomeViewModel } from '@jbrowse/plugin-linear-genome-view'
 import FactCheckIcon from '@mui/icons-material/FactCheck'
+import InputIcon from '@mui/icons-material/Input'
 import TrackChangesIcon from '@mui/icons-material/TrackChanges'
 import { autorun } from 'mobx'
 
 import type { ApolloInternetAccountModel } from '../../ApolloInternetAccount/model'
+import { LocalDriver } from '../../BackendDrivers'
 import {
   DownloadGFF3,
   Export as ExportIcon,
 } from '../../components/DownloadGFF3'
 import { FilterFeatures } from '../../components/FilterFeatures'
+import { ImportAnnotations } from '../../components/ImportAnnotations'
 import { ViewChangeLog } from '../../components/ViewChangeLog'
 import { ViewCheckResults } from '../../components/ViewCheckResults'
 import type { ApolloSessionModel, HoveredFeature } from '../../session'
@@ -137,7 +141,9 @@ export function baseModelFactory(
         const { assemblyName } = region
         const { assemblyManager } =
           self.session as unknown as AbstractSessionModel
-        const assembly = assemblyManager.get(assemblyName)
+        const assembly = assemblyManager.get(assemblyName) as
+          | Assembly
+          | undefined
         if (!assembly) {
           throw new Error(`No assembly found with name ${assemblyName}`)
         }
@@ -150,8 +156,7 @@ export function baseModelFactory(
         ) as ApolloInternetAccountModel | undefined
       },
       get changeManager() {
-        return (self.session as unknown as ApolloSessionModel).apolloDataStore
-          .changeManager
+        return self.session.apolloDataStore.changeManager
       },
       getAssemblyId(assemblyName: string) {
         const { assemblyManager } =
@@ -163,12 +168,10 @@ export function baseModelFactory(
         return assembly.name
       },
       get selectedFeature(): AnnotationFeature | undefined {
-        return (self.session as unknown as ApolloSessionModel)
-          .apolloSelectedFeature
+        return self.session.apolloSelectedFeature
       },
       get hoveredFeature(): HoveredFeature | undefined {
-        return (self.session as unknown as ApolloSessionModel)
-          .apolloHoveredFeature
+        return self.session.apolloHoveredFeature
       },
     }))
     .actions((self) => ({
@@ -213,8 +216,12 @@ export function baseModelFactory(
       const { filteredFeatureTypes, trackMenuItems: superTrackMenuItems } = self
       return {
         trackMenuItems() {
-          const { graphical, table, showCheckResults } = self
-          return [
+          const { graphical, table, showCheckResults, session } = self
+          const [region] = self.regions
+          const { assemblyName } = region
+          const backendDriver =
+            session.apolloDataStore.getBackendDriver(assemblyName)
+          const items = [
             ...superTrackMenuItems(),
             {
               type: 'subMenu',
@@ -266,7 +273,7 @@ export function baseModelFactory(
             {
               label: 'Filter features by type',
               onClick: () => {
-                const session = self.session as unknown as ApolloSessionModel
+                const { session } = self
                 ;(self.session as unknown as AbstractSessionModel).queueDialog(
                   (doneCallback) => [
                     FilterFeatures,
@@ -284,6 +291,28 @@ export function baseModelFactory(
                 )
               },
             },
+          ]
+          if (backendDriver instanceof LocalDriver) {
+            items.push({
+              label: 'Import annotations',
+              icon: InputIcon,
+              onClick: () => {
+                ;(session as unknown as AbstractSessionModel).queueDialog(
+                  (doneCallback) => [
+                    ImportAnnotations,
+                    {
+                      session,
+                      assemblyName,
+                      handleClose: () => {
+                        doneCallback()
+                      },
+                    },
+                  ],
+                )
+              },
+            })
+          }
+          items.push(
             {
               label: 'Export annotations',
               icon: ExportIcon,
@@ -294,7 +323,7 @@ export function baseModelFactory(
                 if (!assembly) {
                   return
                 }
-                const session = self.session as unknown as ApolloSessionModel
+                const { session } = self
                 ;(session as unknown as AbstractSessionModel).queueDialog(
                   (doneCallback) => [
                     DownloadGFF3,
@@ -319,7 +348,7 @@ export function baseModelFactory(
                 if (!assembly) {
                   return
                 }
-                const session = self.session as unknown as ApolloSessionModel
+                const { session } = self
                 ;(session as unknown as AbstractSessionModel).queueDialog(
                   (doneCallback) => [
                     ViewChangeLog,
@@ -344,7 +373,7 @@ export function baseModelFactory(
                 if (!assembly) {
                   return
                 }
-                const session = self.session as unknown as ApolloSessionModel
+                const { session } = self
                 ;(session as unknown as AbstractSessionModel).queueDialog(
                   (doneCallback) => [
                     ViewCheckResults,
@@ -359,20 +388,17 @@ export function baseModelFactory(
                 )
               },
             },
-          ]
+          )
+          return items
         },
       }
     })
     .actions((self) => ({
       setSelectedFeature(feature?: AnnotationFeature) {
-        ;(
-          self.session as unknown as ApolloSessionModel
-        ).apolloSetSelectedFeature(feature)
+        self.session.apolloSetSelectedFeature(feature)
       },
       setHoveredFeature(hoveredFeature?: HoveredFeature) {
-        ;(
-          self.session as unknown as ApolloSessionModel
-        ).apolloSetHoveredFeature(hoveredFeature)
+        self.session.apolloSetHoveredFeature(hoveredFeature)
       },
       showFeatureDetailsWidget(
         feature: AnnotationFeature,
@@ -411,9 +437,7 @@ export function baseModelFactory(
                 return
               }
               self.setLoading(true)
-              void (
-                self.session as unknown as ApolloSessionModel
-              ).apolloDataStore
+              void self.session.apolloDataStore
                 .loadFeatures(self.regions)
                 .then(() => {
                   setTimeout(() => {

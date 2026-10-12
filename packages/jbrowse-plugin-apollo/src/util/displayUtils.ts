@@ -1,6 +1,6 @@
 import type { CheckResultIdsType } from '@apollo-annotation/mst'
-import { makeStyles } from '@jbrowse/core/util/tss-react'
 import type { Theme } from '@mui/material'
+import { makeStyles } from 'tss-react/mui'
 
 export { default as EditZoomThresholdDialog } from '../components/EditZoomThresholdDialog'
 
@@ -171,7 +171,7 @@ export function colorCode(letter: string, theme: Theme) {
     letterUpper === 'G' ||
     letterUpper === 'T'
   ) {
-    return theme.palette.bases[letterUpper].main.toString()
+    return theme.palette.bases[letterUpper].main
   }
   return 'lightgray'
 }

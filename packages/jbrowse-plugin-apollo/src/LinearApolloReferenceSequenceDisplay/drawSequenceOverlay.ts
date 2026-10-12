@@ -68,7 +68,7 @@ function fillAndStrokeRect(
   ctx.strokeRect(left, top, width, height)
 }
 
-function drawHighlight(
+function drawHover(
   ctx: CanvasRenderingContext2D,
   feature: AnnotationFeature,
   bpPerPx: number,
@@ -166,7 +166,7 @@ export function drawSequenceOverlay(
           feature._id === selectedFeature?._id,
         )
       } else {
-        drawHighlight(
+        drawHover(
           ctx,
           feature,
           bpPerPx,

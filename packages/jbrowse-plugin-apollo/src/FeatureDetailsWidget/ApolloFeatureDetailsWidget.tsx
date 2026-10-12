@@ -1,5 +1,4 @@
 import { getSession } from '@jbrowse/core/util'
-import { makeStyles } from '@jbrowse/core/util/tss-react'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import {
   Accordion,
@@ -9,14 +8,16 @@ import {
 } from '@mui/material'
 import { observer } from 'mobx-react'
 import React, { useEffect, useState } from 'react'
+import { makeStyles } from 'tss-react/mui'
 
 import type { ApolloSessionModel } from '../session'
 
 import { Attributes } from './Attributes'
 import { BasicInformation } from './BasicInformation'
 import { FeatureDetailsNavigation } from './FeatureDetailsNavigation'
-import { Sequence } from './Sequence'
+import { SequenceViewer } from './SequenceViewer'
 import type { ApolloFeatureDetailsWidget as ApolloFeatureDetails } from './model'
+import { type SequenceSegment, getLocationIntervals } from './sequenceSegments'
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -35,6 +36,7 @@ export const ApolloFeatureDetailsWidget = observer(
     const [panelState, setPanelState] = useState<string[]>(['attributes'])
 
     useEffect(() => {
+      // eslint-disable-next-line @eslint-react/set-state-in-effect
       setPanelState(['attributes'])
     }, [feature])
 
@@ -52,6 +54,10 @@ export const ApolloFeatureDetailsWidget = observer(
         { assemblyName: assembly, refName, start: min, end: max },
       ])
     }
+    const sequenceSegments: SequenceSegment[] = sequence
+      ? [{ type: 'plain', sequence, locs: [{ min, max }] }]
+      : []
+    const locationIntervals = getLocationIntervals(sequenceSegments)
 
     function handlePanelChange(expanded: boolean, panel: string) {
       if (expanded) {
@@ -106,12 +112,12 @@ export const ApolloFeatureDetailsWidget = observer(
             <Typography component="span">Sequence</Typography>
           </AccordionSummary>
           <AccordionDetails>
-            {panelState.includes('sequence') && (
-              <Sequence
-                feature={feature}
-                session={session}
-                assembly={currentAssembly._id}
-                refName={refName}
+            {panelState.includes('sequence') && sequence && (
+              <SequenceViewer
+                refSeqName={refName}
+                strand={feature.strand === -1 ? -1 : 1}
+                locationIntervals={locationIntervals}
+                sequenceSegments={sequenceSegments}
               />
             )}
           </AccordionDetails>

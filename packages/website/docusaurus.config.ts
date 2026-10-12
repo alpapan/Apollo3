@@ -21,7 +21,6 @@ const config: Config = {
   projectName: 'Apollo3', // Usually your repo name.
 
   onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
 
   trailingSlash: false,
 
@@ -31,6 +30,12 @@ const config: Config = {
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
+  },
+
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
   },
 
   presets: [
@@ -105,6 +110,7 @@ const config: Config = {
       darkTheme: prismThemes.vsDark,
       additionalLanguages: ['docker', 'shell-session', 'bash'],
     },
+    respectPrefersColorScheme: true,
   } satisfies Preset.ThemeConfig,
 }
 

@@ -1,14 +1,14 @@
-import pluginCypress from 'eslint-plugin-cypress/flat'
-import tseslint from 'typescript-eslint'
-
 import js from '@eslint/js'
-import pluginImport from 'eslint-plugin-import'
-import pluginJSXA11y from 'eslint-plugin-jsx-a11y'
-import pluginReact from 'eslint-plugin-react'
+import pluginReact from '@eslint-react/eslint-plugin'
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript'
+import pluginCypress from 'eslint-plugin-cypress/flat'
+import pluginImportX from 'eslint-plugin-import-x'
+import pluginJSXA11y from 'eslint-plugin-jsx-a11y-x'
 import pluginReactHooks from 'eslint-plugin-react-hooks'
 import pluginTSDoc from 'eslint-plugin-tsdoc'
 import pluginUnicorn from 'eslint-plugin-unicorn'
 import globals from 'globals'
+import tseslint from 'typescript-eslint'
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
@@ -27,25 +27,20 @@ export default [
   },
   js.configs.recommended,
   pluginUnicorn.configs.recommended,
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  pluginImport.flatConfigs.typescript,
+  pluginImportX.flatConfigs.typescript,
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
-  pluginReact.configs.flat.recommended,
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  pluginJSXA11y.flatConfigs.recommended,
-  pluginCypress.configs.recommended,
   {
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
       parserOptions: { projectService: true },
     },
-    // Pinned to the react version every package declares (^18.2.0); 'detect' warns
-    // under Yarn PnP because react is not resolvable at the config root. Bump on a
-    // React major upgrade.
-    settings: { react: { version: '18.2' } },
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    plugins: { tsdoc: pluginTSDoc, import: pluginImport },
+    plugins: {
+      tsdoc: pluginTSDoc,
+    },
+    settings: {
+      'import-x/resolver-next': [createTypeScriptImportResolver()],
+    },
     rules: {
       // eslint built-in rules (override recommended)
       curly: 'warn',
@@ -88,12 +83,12 @@ export default [
         { allowNumber: true },
       ],
       '@typescript-eslint/return-await': 'error',
-      // eslint-plugin-import rules
-      'import/export': 'error',
-      'import/no-duplicates': ['warn', { 'prefer-inline': true }],
-      'import/no-extraneous-dependencies': 'error',
-      'import/no-named-as-default': 'warn',
-      'import/order': [
+      // eslint-plugin-import-x rules
+      'import-x/export': 'error',
+      'import-x/no-duplicates': ['warn', { 'prefer-inline': true }],
+      'import-x/no-extraneous-dependencies': 'error',
+      'import-x/no-named-as-default': 'warn',
+      'import-x/order': [
         'warn',
         {
           named: true,
@@ -113,14 +108,36 @@ export default [
     },
   },
   {
-    name: 'eslint-plugin-react-hooks/recommended',
+    ...pluginReactHooks.configs.flat.recommended,
     files: [
       'packages/jbrowse-plugin-apollo/src/**/*.{jsx,tsx}',
       'packages/website/src/**/*.{jsx,tsx}',
     ],
-    plugins: { 'react-hooks': pluginReactHooks },
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    rules: { ...pluginReactHooks.configs.recommended.rules },
+  },
+  {
+    ...pluginReact.configs['disable-conflict-eslint-plugin-react-hooks'],
+    files: [
+      'packages/jbrowse-plugin-apollo/src/**/*.{jsx,tsx}',
+      'packages/website/src/**/*.{jsx,tsx}',
+    ],
+  },
+  {
+    ...pluginReact.configs['recommended-typescript'],
+    files: [
+      'packages/jbrowse-plugin-apollo/src/**/*.{jsx,tsx}',
+      'packages/website/src/**/*.{jsx,tsx}',
+    ],
+  },
+  {
+    ...pluginJSXA11y.configs.recommended,
+    files: [
+      'packages/jbrowse-plugin-apollo/src/**/*.{jsx,tsx}',
+      'packages/website/src/**/*.{jsx,tsx}',
+    ],
+  },
+  {
+    ...pluginCypress.configs.recommended,
+    files: ['packages/jbrowse-plugin-apollo/cypress/**/*'],
   },
   // Don't enforce tsdoc syntax in JS files
   {
@@ -132,6 +149,11 @@ export default [
   {
     files: ['packages/apollo-cli/src/**/*.ts'],
     rules: { '@typescript-eslint/no-deprecated': 'off' },
+  },
+  // The collaboration server logs exclusively through Nest's Logger
+  {
+    files: ['packages/apollo-collaboration-server/src/**/*.ts'],
+    rules: { 'no-console': 'error' },
   },
   // Jest mocks at the NestJS DI boundary (Mongoose Model, gateway, ConfigService
   // injected via `useValue`) cannot satisfy strict-type-checked's `no-unsafe-*`

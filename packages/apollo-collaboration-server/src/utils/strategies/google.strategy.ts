@@ -33,13 +33,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy) {
       })
       clientID = clientIDFile && fs.readFileSync(clientIDFile, 'utf8').trim()
     }
-    const configured = Boolean(clientID)
-    if (!configured) {
-      clientID = 'none'
-    }
+    clientID ??= 'none'
     let clientSecret = 'none'
     let callbackURL
-    if (configured) {
+    if (clientID !== 'none') {
       clientSecret = configService.get('GOOGLE_CLIENT_SECRET', { infer: true })
       if (!clientSecret) {
         // We can use non-null assertion since joi already checks this for us
@@ -57,12 +54,14 @@ export class GoogleStrategy extends PassportStrategy(Strategy) {
       }auth/google`
       callbackURL = callbackURI.href
     }
+    // @ts-expect-error published types are missing boolean for "store"
     super({
       clientID,
       clientSecret,
       callbackURL,
       scope: ['email', 'profile'],
       store: true,
+      passReqToCallback: false,
     })
 
     // Apply proxy to OAuth2 instance

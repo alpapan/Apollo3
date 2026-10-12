@@ -16,7 +16,7 @@ $ npm install -g @apollo-annotation/cli
 $ apollo COMMAND
 running command...
 $ apollo (--version)
-@apollo-annotation/cli/0.3.13 linux-x64 node-v24.14.1
+@apollo-annotation/cli/1.1.3 linux-x64 node-v24.14.1
 $ apollo --help [COMMAND]
 USAGE
   $ apollo COMMAND
@@ -56,7 +56,7 @@ USAGE
 - [`apollo file download`](#apollo-file-download)
 - [`apollo file get`](#apollo-file-get)
 - [`apollo file upload INPUT-FILE`](#apollo-file-upload-input-file)
-- [`apollo help [COMMANDS]`](#apollo-help-commands)
+- [`apollo help [COMMAND]`](#apollo-help-command)
 - [`apollo jbrowse desktop JBROWSEFILE`](#apollo-jbrowse-desktop-jbrowsefile)
 - [`apollo jbrowse get-config`](#apollo-jbrowse-get-config)
 - [`apollo jbrowse set-config INPUTFILE`](#apollo-jbrowse-set-config-inputfile)
@@ -73,8 +73,8 @@ Add a new assembly from fasta input
 
 ```
 USAGE
-  $ apollo assembly add-from-fasta INPUT [--profile <value>] [--config-file <value>] [-a <value>] [-f] [-e] [--fai <value>]
-    [--gzi <value>] [-z | -d]
+  $ apollo assembly add-from-fasta INPUT [--profile <value>] [--config-file <value>] [--timeout <value>] [-a <value>] [-f]
+    [-e] [--fai <value>] [--gzi <value>] [-z | -d]
 
 ARGUMENTS
   INPUT  Input fasta file, local or remote, or id of a previously uploaded file. For local or remote files, it is
@@ -93,6 +93,7 @@ FLAGS
       --fai=<value>          Fasta index of the (not-editable) fasta file
       --gzi=<value>          Gzi index of the (not-editable) fasta file
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Add a new assembly from fasta input
@@ -117,7 +118,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/assembly/add-from-fasta.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/assembly/add-from-fasta.ts)_
+[src/commands/assembly/add-from-fasta.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/assembly/add-from-fasta.ts)_
 
 ## `apollo assembly add-from-gff INPUT-FILE`
 
@@ -125,8 +126,8 @@ Add new assembly from gff or gft file
 
 ```
 USAGE
-  $ apollo assembly add-from-gff INPUT-FILE [--profile <value>] [--config-file <value>] [-a <value>] [-o] [-f]
-  [--no-strict]
+  $ apollo assembly add-from-gff INPUT-FILE [--profile <value>] [--config-file <value>] [--timeout <value>] [-a <value>]
+    [-o] [-f] [--no-strict]
 
 ARGUMENTS
   INPUT-FILE  Input gff file
@@ -139,6 +140,7 @@ FLAGS
       --no-strict            If any feature lines in the GFF3 can't be processed, skip them instead of aborting the
                              import
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Add new assembly from gff or gft file
@@ -156,7 +158,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/assembly/add-from-gff.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/assembly/add-from-gff.ts)_
+[src/commands/assembly/add-from-gff.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/assembly/add-from-gff.ts)_
 
 ## `apollo assembly check`
 
@@ -164,7 +166,8 @@ Add, view, or delete checks to assembly
 
 ```
 USAGE
-  $ apollo assembly check [--profile <value>] [--config-file <value>] [-a <value>] [-c <value>] [-d]
+  $ apollo assembly check [--profile <value>] [--config-file <value>] [--timeout <value>] [-a <value>] [-c
+    <value>...] [-d]
 
 FLAGS
   -a, --assembly=<value>     Manage checks in this assembly
@@ -172,6 +175,7 @@ FLAGS
   -d, --delete               Delete (instead of adding) checks
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Add, view, or delete checks to assembly
@@ -198,7 +202,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/assembly/check.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/assembly/check.ts)_
+[src/commands/assembly/check.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/assembly/check.ts)_
 
 ## `apollo assembly delete`
 
@@ -206,13 +210,14 @@ Delete assemblies
 
 ```
 USAGE
-  $ apollo assembly delete -a <value> [--profile <value>] [--config-file <value>] [-v]
+  $ apollo assembly delete -a <value>... [--profile <value>] [--config-file <value>] [--timeout <value>] [-v]
 
 FLAGS
   -a, --assembly=<value>...  (required) Assembly names or IDs to delete
   -v, --verbose              Print to stdout the array of assemblies deleted
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Delete assemblies
@@ -226,7 +231,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/assembly/delete.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/assembly/delete.ts)_
+[src/commands/assembly/delete.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/assembly/delete.ts)_
 
 ## `apollo assembly get`
 
@@ -234,12 +239,13 @@ Get available assemblies
 
 ```
 USAGE
-  $ apollo assembly get [--profile <value>] [--config-file <value>] [-a <value>]
+  $ apollo assembly get [--profile <value>] [--config-file <value>] [--timeout <value>] [-a <value>...]
 
 FLAGS
   -a, --assembly=<value>...  Get assemblies in this list of names or IDs
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get available assemblies
@@ -248,7 +254,7 @@ DESCRIPTION
 ```
 
 _See code:
-[src/commands/assembly/get.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/assembly/get.ts)_
+[src/commands/assembly/get.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/assembly/get.ts)_
 
 ## `apollo assembly sequence`
 
@@ -256,8 +262,8 @@ Get reference sequence in fasta format
 
 ```
 USAGE
-  $ apollo assembly sequence [--profile <value>] [--config-file <value>] [-a <value>] [-r <value>] [-s <value>] [-e
-    <value>]
+  $ apollo assembly sequence [--profile <value>] [--config-file <value>] [--timeout <value>] [-a <value>] [-r <value>]
+    [-s <value>] [-e <value>]
 
 FLAGS
   -a, --assembly=<value>     Find input reference sequence in this assembly
@@ -266,6 +272,7 @@ FLAGS
   -s, --start=<value>        [default: 1] Start coordinate (1-based)
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get reference sequence in fasta format
@@ -283,7 +290,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/assembly/sequence.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/assembly/sequence.ts)_
+[src/commands/assembly/sequence.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/assembly/sequence.ts)_
 
 ## `apollo change get`
 
@@ -291,12 +298,13 @@ Get list of changes
 
 ```
 USAGE
-  $ apollo change get [--profile <value>] [--config-file <value>] [-a <value>]
+  $ apollo change get [--profile <value>] [--config-file <value>] [--timeout <value>] [-a <value>...]
 
 FLAGS
   -a, --assembly=<value>...  Get changes only for these assembly names or IDs (but see description)
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get list of changes
@@ -307,7 +315,7 @@ DESCRIPTION
 ```
 
 _See code:
-[src/commands/change/get.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/change/get.ts)_
+[src/commands/change/get.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/change/get.ts)_
 
 ## `apollo config [KEY] [VALUE]`
 
@@ -315,16 +323,18 @@ Get or set apollo configuration options
 
 ```
 USAGE
-  $ apollo config [KEY] [VALUE] [--profile <value>] [---file <value>] [--get-config-file]
+  $ apollo config [KEY] [VALUE] [--profile <value>] [--config-file <value>] [--timeout <value>]
+    [--get-config-file]
 
 ARGUMENTS
-  KEY    Name of configuration parameter
-  VALUE  Parameter value
+  [KEY]    Name of configuration parameter
+  [VALUE]  Parameter value
 
 FLAGS
   --config-file=<value>  Use this config file (mostly for testing)
   --get-config-file      Return the path to the config file and exit (this file may not exist yet)
   --profile=<value>      Profile to create or edit
+  --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get or set apollo configuration options
@@ -359,7 +369,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/config.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/config.ts)_
+[src/commands/config.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/config.ts)_
 
 ## `apollo export gff3 ASSEMBLY`
 
@@ -367,7 +377,7 @@ Export the annotations for an assembly to stdout as gff3
 
 ```
 USAGE
-  $ apollo export gff3 ASSEMBLY [--profile <value>] [--config-file <value>] [--include-fasta]
+  $ apollo export gff3 ASSEMBLY [--profile <value>] [--config-file <value>] [--timeout <value>] [--include-fasta]
 
 ARGUMENTS
   ASSEMBLY  Export annotations for this assembly name or id
@@ -376,6 +386,7 @@ FLAGS
   --config-file=<value>  Use this config file (mostly for testing)
   --include-fasta        Include fasta sequence in output
   --profile=<value>      Use credentials from this profile
+  --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Export the annotations for an assembly to stdout as gff3
@@ -387,7 +398,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/export/gff3.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/export/gff3.ts)_
+[src/commands/export/gff3.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/export/gff3.ts)_
 
 ## `apollo feature add [FEATURE-JSON]`
 
@@ -395,11 +406,11 @@ Add one or more features to Apollo
 
 ```
 USAGE
-  $ apollo feature add [FEATURE-JSON] [--profile <value>] [--config-file <value>] [-a <value>] [-r <value> -s
-    <value> -e <value> -t <value>] [-F <value>]
+  $ apollo feature add [FEATURE-JSON] [--profile <value>] [--config-file <value>] [--timeout <value>] [-a
+    <value>] [-r <value> -s <value> -e <value> -t <value>] [-F <value>]
 
 ARGUMENTS
-  FEATURE-JSON  Inline JSON describing the feature(s) to add. Can also be provided via stdin.
+  [FEATURE-JSON]  Inline JSON describing the feature(s) to add. Can also be provided via stdin.
 
 FLAGS
   -F, --feature-json-file=<value>  File with JSON describing the feature(s) to add
@@ -410,6 +421,7 @@ FLAGS
   -t, --type=<value>               Type of child feature
       --config-file=<value>        Use this config file (mostly for testing)
       --profile=<value>            Use credentials from this profile
+      --timeout=<value>            [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Add one or more features to Apollo
@@ -443,7 +455,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/add.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/add.ts)_
+[src/commands/feature/add.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/add.ts)_
 
 ## `apollo feature add-child`
 
@@ -451,7 +463,8 @@ Add a child feature (e.g. add an exon to an mRNA)
 
 ```
 USAGE
-  $ apollo feature add-child -s <value> -e <value> -t <value> [--profile <value>] [--config-file <value>] [-i <value>]
+  $ apollo feature add-child -s <value> -e <value> -t <value> [--profile <value>] [--config-file <value>] [--timeout
+    <value>] [-i <value>]
 
 FLAGS
   -e, --end=<value>          (required) End coordinate of the child feature (1-based)
@@ -460,6 +473,7 @@ FLAGS
   -t, --type=<value>         (required) Type of child feature
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Add a child feature (e.g. add an exon to an mRNA)
@@ -474,7 +488,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/add-child.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/add-child.ts)_
+[src/commands/feature/add-child.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/add-child.ts)_
 
 ## `apollo feature check`
 
@@ -482,13 +496,15 @@ Get check results
 
 ```
 USAGE
-  $ apollo feature check [--profile <value>] [--config-file <value>] [-i <value>] [-a <value>]
+  $ apollo feature check [--profile <value>] [--config-file <value>] [--timeout <value>] [-i <value>...] [-a
+    <value>]
 
 FLAGS
   -a, --assembly=<value>       Get checks for this assembly
   -i, --feature-id=<value>...  Get checks for these feature identifiers
       --config-file=<value>    Use this config file (mostly for testing)
       --profile=<value>        Use credentials from this profile
+      --timeout=<value>        [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get check results
@@ -507,7 +523,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/check.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/check.ts)_
+[src/commands/feature/check.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/check.ts)_
 
 ## `apollo feature copy`
 
@@ -515,7 +531,8 @@ Copy a feature to another location
 
 ```
 USAGE
-  $ apollo feature copy -r <value> -s <value> [--profile <value>] [--config-file <value>] [-i <value>] [-a <value>]
+  $ apollo feature copy -r <value> -s <value> [--profile <value>] [--config-file <value>] [--timeout <value>] [-i
+    <value>] [-a <value>]
 
 FLAGS
   -a, --assembly=<value>     Name or ID of target assembly. Not required if refseq is unique in the database
@@ -524,6 +541,7 @@ FLAGS
   -s, --start=<value>        (required) Start position in target reference sequence
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Copy a feature to another location
@@ -538,7 +556,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/copy.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/copy.ts)_
+[src/commands/feature/copy.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/copy.ts)_
 
 ## `apollo feature delete`
 
@@ -546,7 +564,7 @@ Delete one or more features by ID
 
 ```
 USAGE
-  $ apollo feature delete [--profile <value>] [--config-file <value>] [-i <value>] [-f] [-n]
+  $ apollo feature delete [--profile <value>] [--config-file <value>] [--timeout <value>] [-i <value>...] [-f] [-n]
 
 FLAGS
   -f, --force                  Ignore non-existing features
@@ -554,6 +572,7 @@ FLAGS
   -n, --dry-run                Only show what would be delete
       --config-file=<value>    Use this config file (mostly for testing)
       --profile=<value>        Use credentials from this profile
+      --timeout=<value>        [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Delete one or more features by ID
@@ -562,7 +581,7 @@ DESCRIPTION
 ```
 
 _See code:
-[src/commands/feature/delete.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/delete.ts)_
+[src/commands/feature/delete.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/delete.ts)_
 
 ## `apollo feature edit`
 
@@ -570,12 +589,13 @@ Edit features using an appropiate json input
 
 ```
 USAGE
-  $ apollo feature edit [--profile <value>] [--config-file <value>] [-j <value>]
+  $ apollo feature edit [--profile <value>] [--config-file <value>] [--timeout <value>] [-j <value>]
 
 FLAGS
   -j, --json-input=<value>   [default: -] Json string or json file or "-" to read json from stdin
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Edit features using an appropiate json input
@@ -604,7 +624,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/edit.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/edit.ts)_
+[src/commands/feature/edit.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/edit.ts)_
 
 ## `apollo feature edit-attribute`
 
@@ -612,7 +632,8 @@ Add, edit, or view a feature attribute
 
 ```
 USAGE
-  $ apollo feature edit-attribute -a <value> [--profile <value>] [--config-file <value>] [-i <value>] [-v <value>] [-d]
+  $ apollo feature edit-attribute -a <value> [--profile <value>] [--config-file <value>] [--timeout <value>] [-i <value>]
+    [-v <value>...] [-d]
 
 FLAGS
   -a, --attribute=<value>    (required) Attribute key to add or edit
@@ -622,6 +643,7 @@ FLAGS
                              current value
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Add, edit, or view a feature attribute
@@ -644,7 +666,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/edit-attribute.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/edit-attribute.ts)_
+[src/commands/feature/edit-attribute.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/edit-attribute.ts)_
 
 ## `apollo feature edit-coords`
 
@@ -652,7 +674,8 @@ Edit feature start and/or end coordinates
 
 ```
 USAGE
-  $ apollo feature edit-coords [--profile <value>] [--config-file <value>] [-i <value>] [-s <value>] [-e <value>]
+  $ apollo feature edit-coords [--profile <value>] [--config-file <value>] [--timeout <value>] [-i <value>] [-s <value>]
+    [-e <value>]
 
 FLAGS
   -e, --end=<value>          New end coordinate (1-based)
@@ -660,6 +683,7 @@ FLAGS
   -s, --start=<value>        New start coordinate (1-based)
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Edit feature start and/or end coordinates
@@ -678,7 +702,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/edit-coords.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/edit-coords.ts)_
+[src/commands/feature/edit-coords.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/edit-coords.ts)_
 
 ## `apollo feature edit-type`
 
@@ -686,13 +710,14 @@ Edit or view feature type
 
 ```
 USAGE
-  $ apollo feature edit-type [--profile <value>] [--config-file <value>] [-i <value>] [-t <value>]
+  $ apollo feature edit-type [--profile <value>] [--config-file <value>] [--timeout <value>] [-i <value>] [-t <value>]
 
 FLAGS
   -i, --feature-id=<value>   [default: -] Feature ID to edit or "-" to read it from stdin
   -t, --type=<value>         Assign feature to this type. If unset return the current type
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Edit or view feature type
@@ -702,7 +727,7 @@ DESCRIPTION
 ```
 
 _See code:
-[src/commands/feature/edit-type.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/edit-type.ts)_
+[src/commands/feature/edit-type.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/edit-type.ts)_
 
 ## `apollo feature get`
 
@@ -710,8 +735,8 @@ Get features in assembly, reference sequence or genomic window
 
 ```
 USAGE
-  $ apollo feature get [--profile <value>] [--config-file <value>] [-a <value>] [-r <value>] [-s <value>] [-e
-    <value>]
+  $ apollo feature get [--profile <value>] [--config-file <value>] [--timeout <value>] [-a <value>] [-r <value>]
+    [-s <value>] [-e <value>]
 
 FLAGS
   -a, --assembly=<value>     Find input reference sequence in this assembly
@@ -720,6 +745,7 @@ FLAGS
   -s, --start=<value>        [default: 1] Start coordinate (1-based)
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get features in assembly, reference sequence or genomic window
@@ -736,7 +762,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/get.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/get.ts)_
+[src/commands/feature/get.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/get.ts)_
 
 ## `apollo feature get-id`
 
@@ -744,13 +770,14 @@ Get features given their identifiers
 
 ```
 USAGE
-  $ apollo feature get-id [--profile <value>] [--config-file <value>] [-i <value>]
+  $ apollo feature get-id [--profile <value>] [--config-file <value>] [--timeout <value>] [-i <value>...]
 
 FLAGS
   -i, --feature-id=<value>...  [default: -] Retrieves feature with these IDs. Use "-" to read IDs from stdin (one per
                                line)
       --config-file=<value>    Use this config file (mostly for testing)
       --profile=<value>        Use credentials from this profile
+      --timeout=<value>        [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get features given their identifiers
@@ -764,7 +791,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/get-id.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/get-id.ts)_
+[src/commands/feature/get-id.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/get-id.ts)_
 
 ## `apollo feature get-indexed-id ID`
 
@@ -772,7 +799,8 @@ Get features given an indexed identifier
 
 ```
 USAGE
-  $ apollo feature get-indexed-id ID [--profile <value>] [--config-file <value>] [-a <value>] [--topLevel]
+  $ apollo feature get-indexed-id ID [--profile <value>] [--config-file <value>] [--timeout <value>] [-a <value>...]
+    [--topLevel]
 
 ARGUMENTS
   ID  Indexed identifier to search for
@@ -782,6 +810,7 @@ FLAGS
                              assemblies
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
       --topLevel             Return the top-level parent of the feature instead of the feature itself
 
 DESCRIPTION
@@ -796,7 +825,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/get-indexed-id.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/get-indexed-id.ts)_
+[src/commands/feature/get-indexed-id.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/get-indexed-id.ts)_
 
 ## `apollo feature import INPUT-FILE`
 
@@ -804,7 +833,8 @@ Import features from local gff file
 
 ```
 USAGE
-  $ apollo feature import INPUT-FILE -a <value> [--profile <value>] [--config-file <value>] [-d] [--no-strict]
+  $ apollo feature import INPUT-FILE -a <value> [--profile <value>] [--config-file <value>] [--timeout <value>] [-d]
+    [--no-strict]
 
 ARGUMENTS
   INPUT-FILE  Input gff file
@@ -815,6 +845,7 @@ FLAGS
       --config-file=<value>  Use this config file (mostly for testing)
       --no-strict            If any lines in the GFF3 can't be processed, skip them instead of aborting the import
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Import features from local gff file
@@ -828,7 +859,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/import.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/import.ts)_
+[src/commands/feature/import.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/import.ts)_
 
 ## `apollo feature search`
 
@@ -836,7 +867,7 @@ Free text search for feature in one or more assemblies
 
 ```
 USAGE
-  $ apollo feature search -t <value> [--profile <value>] [--config-file <value>] [-a <value>]
+  $ apollo feature search -t <value> [--profile <value>] [--config-file <value>] [--timeout <value>] [-a <value>...]
 
 FLAGS
   -a, --assembly=<value>...  Assembly names or IDs to search; use "-" to read it from stdin. If omitted search all
@@ -844,6 +875,7 @@ FLAGS
   -t, --text=<value>         (required) Search for this text query
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Free text search for feature in one or more assemblies
@@ -879,7 +911,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/feature/search.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/feature/search.ts)_
+[src/commands/feature/search.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/feature/search.ts)_
 
 ## `apollo file delete`
 
@@ -887,12 +919,13 @@ Delete files from the Apollo server
 
 ```
 USAGE
-  $ apollo file delete [--profile <value>] [--config-file <value>] [-i <value>]
+  $ apollo file delete [--profile <value>] [--config-file <value>] [--timeout <value>] [-i <value>...]
 
 FLAGS
   -i, --file-id=<value>...   [default: -] IDs of the files to delete
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Delete files from the Apollo server
@@ -906,7 +939,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/file/delete.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/file/delete.ts)_
+[src/commands/file/delete.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/file/delete.ts)_
 
 ## `apollo file download`
 
@@ -914,13 +947,14 @@ Download a file from the Apollo server
 
 ```
 USAGE
-  $ apollo file download [--profile <value>] [--config-file <value>] [-i <value>] [-o <value>]
+  $ apollo file download [--profile <value>] [--config-file <value>] [--timeout <value>] [-i <value>] [-o <value>]
 
 FLAGS
   -i, --file-id=<value>      [default: -] ID of the file to download
   -o, --output=<value>       Write output to this file or "-" for stdout. Default to the name of the uploaded file.
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Download a file from the Apollo server
@@ -934,7 +968,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/file/download.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/file/download.ts)_
+[src/commands/file/download.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/file/download.ts)_
 
 ## `apollo file get`
 
@@ -942,12 +976,13 @@ Get list of files uploaded to the Apollo server
 
 ```
 USAGE
-  $ apollo file get [--profile <value>] [--config-file <value>] [-i <value>]
+  $ apollo file get [--profile <value>] [--config-file <value>] [--timeout <value>] [-i <value>...]
 
 FLAGS
   -i, --file-id=<value>...   Get files matching this IDs
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get list of files uploaded to the Apollo server
@@ -961,7 +996,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/file/get.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/file/get.ts)_
+[src/commands/file/get.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/file/get.ts)_
 
 ## `apollo file upload INPUT-FILE`
 
@@ -969,7 +1004,7 @@ Upload a local file to the Apollo server
 
 ```
 USAGE
-  $ apollo file upload INPUT-FILE [--profile <value>] [--config-file <value>] [-t
+  $ apollo file upload INPUT-FILE [--profile <value>] [--config-file <value>] [--timeout <value>] [-t
     text/x-fasta|text/x-gff3|application/x-bgzip-fasta|text/x-fai|application/x-gzi] [-z | -d]
 
 ARGUMENTS
@@ -983,6 +1018,7 @@ FLAGS
   -z, --gzip                 Override autodetection and instruct that input is gzip compressed
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Upload a local file to the Apollo server
@@ -998,18 +1034,18 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/file/upload.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/file/upload.ts)_
+[src/commands/file/upload.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/file/upload.ts)_
 
-## `apollo help [COMMANDS]`
+## `apollo help [COMMAND]`
 
 Display help for apollo.
 
 ```
 USAGE
-  $ apollo help [COMMANDS] [-n]
+  $ apollo help [COMMAND...] [-n]
 
 ARGUMENTS
-  COMMANDS  Command to show help for.
+  [COMMAND...]  Command to show help for.
 
 FLAGS
   -n, --nested-commands  Include all nested commands in the output.
@@ -1019,7 +1055,7 @@ DESCRIPTION
 ```
 
 _See code:
-[@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.0.8/src/commands/help.ts)_
+[@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.53/src/commands/help.ts)_
 
 ## `apollo jbrowse desktop JBROWSEFILE`
 
@@ -1027,7 +1063,8 @@ Generate JBrowse file for use with desktop client
 
 ```
 USAGE
-  $ apollo jbrowse desktop JBROWSEFILE [--profile <value>] [--config-file <value>] [-o | -w <value>] [-f <value>]
+  $ apollo jbrowse desktop JBROWSEFILE [--profile <value>] [--config-file <value>] [--timeout <value>] [-o | -w
+    <value>] [-f <value>]
 
 ARGUMENTS
   JBROWSEFILE  Generated JBrowse file
@@ -1038,6 +1075,7 @@ FLAGS
   -w, --open-with=<value>    open generated file with specified application
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Generate JBrowse file for use with desktop client
@@ -1064,7 +1102,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/jbrowse/desktop.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/jbrowse/desktop.ts)_
+[src/commands/jbrowse/desktop.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/jbrowse/desktop.ts)_
 
 ## `apollo jbrowse get-config`
 
@@ -1072,11 +1110,12 @@ Get JBrowse configuration from Apollo
 
 ```
 USAGE
-  $ apollo jbrowse get-config [--profile <value>] [--config-file <value>]
+  $ apollo jbrowse get-config [--profile <value>] [--config-file <value>] [--timeout <value>]
 
 FLAGS
   --config-file=<value>  Use this config file (mostly for testing)
   --profile=<value>      Use credentials from this profile
+  --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get JBrowse configuration from Apollo
@@ -1090,7 +1129,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/jbrowse/get-config.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/jbrowse/get-config.ts)_
+[src/commands/jbrowse/get-config.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/jbrowse/get-config.ts)_
 
 ## `apollo jbrowse set-config INPUTFILE`
 
@@ -1098,7 +1137,7 @@ Set JBrowse configuration
 
 ```
 USAGE
-  $ apollo jbrowse set-config INPUTFILE [--profile <value>] [--config-file <value>]
+  $ apollo jbrowse set-config INPUTFILE [--profile <value>] [--config-file <value>] [--timeout <value>]
 
 ARGUMENTS
   INPUTFILE  JBrowse configuration file
@@ -1106,6 +1145,7 @@ ARGUMENTS
 FLAGS
   --config-file=<value>  Use this config file (mostly for testing)
   --profile=<value>      Use credentials from this profile
+  --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Set JBrowse configuration
@@ -1119,7 +1159,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/jbrowse/set-config.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/jbrowse/set-config.ts)_
+[src/commands/jbrowse/set-config.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/jbrowse/set-config.ts)_
 
 ## `apollo login`
 
@@ -1127,8 +1167,8 @@ Login to Apollo
 
 ```
 USAGE
-  $ apollo login [--profile <value>] [--config-file <value>] [-a <value>] [-u <value>] [-p <value>] [-f]
-    [--port <value>]
+  $ apollo login [--profile <value>] [--config-file <value>] [--timeout <value>] [-a <value>] [-u <value>]
+    [-p <value>] [-f] [--port <value>]
 
 FLAGS
   -a, --address=<value>      Address of Apollo server
@@ -1139,6 +1179,7 @@ FLAGS
       --port=<value>         [default: 3000] Get token by listening to this port number (usually this is >= 1024 and <
                              65536)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Login to Apollo
@@ -1158,7 +1199,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/login.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/login.ts)_
+[src/commands/login.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/login.ts)_
 
 ## `apollo logout`
 
@@ -1166,11 +1207,12 @@ Logout of Apollo
 
 ```
 USAGE
-  $ apollo logout [--profile <value>] [--config-file <value>]
+  $ apollo logout [--profile <value>] [--config-file <value>] [--timeout <value>]
 
 FLAGS
   --config-file=<value>  Use this config file (mostly for testing)
   --profile=<value>      Use credentials from this profile
+  --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Logout of Apollo
@@ -1188,7 +1230,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/logout.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/logout.ts)_
+[src/commands/logout.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/logout.ts)_
 
 ## `apollo refseq add-alias INPUT-FILE`
 
@@ -1196,7 +1238,7 @@ Add reference name aliases from a file
 
 ```
 USAGE
-  $ apollo refseq add-alias INPUT-FILE -a <value> [--profile <value>] [--config-file <value>]
+  $ apollo refseq add-alias INPUT-FILE -a <value> [--profile <value>] [--config-file <value>] [--timeout <value>]
 
 ARGUMENTS
   INPUT-FILE  Input refname alias file
@@ -1205,6 +1247,7 @@ FLAGS
   -a, --assembly=<value>     (required) Name for this assembly.
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Add reference name aliases from a file
@@ -1219,7 +1262,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/refseq/add-alias.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/refseq/add-alias.ts)_
+[src/commands/refseq/add-alias.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/refseq/add-alias.ts)_
 
 ## `apollo refseq get`
 
@@ -1227,12 +1270,13 @@ Get reference sequences
 
 ```
 USAGE
-  $ apollo refseq get [--profile <value>] [--config-file <value>] [-a <value>]
+  $ apollo refseq get [--profile <value>] [--config-file <value>] [--timeout <value>] [-a <value>...]
 
 FLAGS
   -a, --assembly=<value>...  Get reference sequences for these assembly names or IDs; use - to read it from stdin
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get reference sequences
@@ -1251,7 +1295,7 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/refseq/get.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/refseq/get.ts)_
+[src/commands/refseq/get.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/refseq/get.ts)_
 
 ## `apollo status`
 
@@ -1259,11 +1303,12 @@ View authentication status
 
 ```
 USAGE
-  $ apollo status [--profile <value>] [--config-file <value>]
+  $ apollo status [--profile <value>] [--config-file <value>] [--timeout <value>]
 
 FLAGS
   --config-file=<value>  Use this config file (mostly for testing)
   --profile=<value>      Use credentials from this profile
+  --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   View authentication status
@@ -1273,7 +1318,7 @@ DESCRIPTION
 ```
 
 _See code:
-[src/commands/status.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/status.ts)_
+[src/commands/status.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/status.ts)_
 
 ## `apollo user get`
 
@@ -1281,13 +1326,14 @@ Get list of users
 
 ```
 USAGE
-  $ apollo user get [--profile <value>] [--config-file <value>] [-u <value>] [-r <value>]
+  $ apollo user get [--profile <value>] [--config-file <value>] [--timeout <value>] [-u <value>] [-r <value>]
 
 FLAGS
   -r, --role=<value>         Get users with this role
   -u, --username=<value>     Find this username
       --config-file=<value>  Use this config file (mostly for testing)
       --profile=<value>      Use credentials from this profile
+      --timeout=<value>      [default: 1h] Timeout for each request to the server
 
 DESCRIPTION
   Get list of users
@@ -1309,6 +1355,6 @@ EXAMPLES
 ```
 
 _See code:
-[src/commands/user/get.ts](https://github.com/GMOD/Apollo3/blob/v0.3.13/packages/apollo-cli/src/commands/user/get.ts)_
+[src/commands/user/get.ts](https://github.com/GMOD/Apollo3/blob/v1.1.3/packages/apollo-cli/src/commands/user/get.ts)_
 
 <!-- commandsstop -->

@@ -30,7 +30,8 @@ import { createFetchErrorMessage } from '../util'
 
 import {
   BackendDriver,
-  type ChangeDocument,
+  type GetChangesOpts,
+  type GetChangesResult,
   type RefNameAliases,
 } from './BackendDriver'
 
@@ -154,20 +155,18 @@ export class CollaborationServerDriver extends BackendDriver {
     internetAccount: ApolloInternetAccount,
   ) {
     const { socket } = internetAccount
-    const token = internetAccount.retrieveToken()
-    if (!token) {
-      return
-    }
-    const localSessionId = makeUserSessionId(token)
     const channel = `${assembly}-${refSeq}`
-    const changeManager = new ChangeManager(this.clientStore)
 
     if (!socket.hasListeners(channel)) {
       socket.on(channel, async (message: ChangeMessage) => {
+        const token = internetAccount.retrieveToken()
+        if (!token) {
+          return
+        }
+        const localSessionId = makeUserSessionId(token)
+        const changeManager = new ChangeManager(this.clientStore)
         // Save server last change sequence into session storage
-        internetAccount.setLastChangeSequenceNumber(
-          Number(message.changeSequence),
-        )
+        internetAccount.setLastChangeSequenceNumber(message.changeSequence)
         if (message.userSessionId === localSessionId) {
           return // we did this change, no need to apply it again
         }
@@ -217,14 +216,12 @@ export class CollaborationServerDriver extends BackendDriver {
       const seq = await inFlightPromise
       return { seq, refSeq }
     }
-    let apolloAssembly = this.clientStore.assemblies.get(assemblyName)
-    if (!apolloAssembly) {
-      apolloAssembly = this.clientStore.addAssembly(assemblyName)
-    }
-    let apolloRefSeq = apolloAssembly.refSeqs.get(refSeq)
-    if (!apolloRefSeq) {
-      apolloRefSeq = apolloAssembly.addRefSeq(refSeq, refName)
-    }
+    const apolloAssembly =
+      this.clientStore.assemblies.get(assemblyName) ??
+      this.clientStore.addAssembly(assemblyName)
+    const apolloRefSeq =
+      apolloAssembly.refSeqs.get(refSeq) ??
+      apolloAssembly.addRefSeq(refSeq, refName)
     const clientStoreSequence = apolloRefSeq.getSequence(start, end)
     if (clientStoreSequence.length === end - start) {
       return { seq: clientStoreSequence, refSeq }
@@ -396,11 +393,39 @@ export class CollaborationServerDriver extends BackendDriver {
     })
   }
 
-  async getChanges(assemblyName: string): Promise<ChangeDocument[]> {
+  async getChanges(
+    assemblyName: string,
+    opts: GetChangesOpts = {},
+  ): Promise<GetChangesResult> {
     const internetAccount = this.clientStore.getInternetAccount(assemblyName)
     const { baseURL } = internetAccount
     const url = new URL('changes', baseURL)
-    url.search = new URLSearchParams({ assembly: assemblyName }).toString()
+    const params: Record<string, string> = { assembly: assemblyName }
+    if (opts.page !== undefined) {
+      params.page = String(opts.page)
+    }
+    if (opts.pageSize !== undefined) {
+      params.pageSize = String(opts.pageSize)
+    }
+    if (opts.sortField) {
+      params.sortField = opts.sortField
+    }
+    if (opts.sortOrder) {
+      params.sortOrder = opts.sortOrder
+    }
+    if (opts.filters?.user) {
+      params.user = opts.filters.user
+    }
+    if (opts.filters?.typeName) {
+      params.typeName = opts.filters.typeName
+    }
+    if (opts.filters?.startTime) {
+      params.startTime = opts.filters.startTime
+    }
+    if (opts.filters?.endTime) {
+      params.endTime = opts.filters.endTime
+    }
+    url.search = new URLSearchParams(params).toString()
     const response = await this.fetch(internetAccount, url.toString())
     if (!response.ok) {
       const errorMessage = await createFetchErrorMessage(
@@ -409,7 +434,7 @@ export class CollaborationServerDriver extends BackendDriver {
       )
       throw new Error(errorMessage)
     }
-    return response.json() as Promise<ChangeDocument[]>
+    return response.json() as Promise<GetChangesResult>
   }
 
   async getCheckResults(assemblyName: string): Promise<CheckResultSnapshot[]> {

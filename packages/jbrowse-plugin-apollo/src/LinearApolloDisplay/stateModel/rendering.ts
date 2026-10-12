@@ -6,8 +6,6 @@ import { type Instance, addDisposer, types } from '@jbrowse/mobx-state-tree'
 import { type Theme, createTheme } from '@mui/material'
 import { autorun } from 'mobx'
 
-import type { ApolloSessionModel } from '../../session'
-
 import { layoutsModelFactory } from './layouts'
 
 export function renderingModelFactory(
@@ -125,9 +123,7 @@ export function renderingModelFactory(
                 self.lgv.dynamicBlocks.totalWidthPx,
                 self.featuresHeight(self.lgv.assemblyNames[0]),
               )
-              for (const collaborator of (
-                self.session as unknown as ApolloSessionModel
-              ).collaborators) {
+              for (const collaborator of self.session.collaborators) {
                 const { locations } = collaborator
                 if (locations.length === 0) {
                   continue
@@ -218,6 +214,31 @@ export function renderingModelFactory(
                       .getGlyph(feature)
                       // @ts-expect-error ts doesn't understand mst extension
                       .draw(self, ctx, feature, row, rowInFeature, block)
+                  }
+                }
+                for (const [row, layoutRow] of byRow.entries()) {
+                  for (const layoutFeature of layoutRow) {
+                    const { feature, rowInFeature } = layoutFeature
+                    if (
+                      !doesIntersect2(
+                        block.start,
+                        block.end,
+                        feature.min,
+                        feature.max,
+                      )
+                    ) {
+                      continue
+                    }
+                    self.getGlyph(feature).drawOverlay(
+                      // @ts-expect-error ts doesn't understand mst extension
+                      self,
+                      ctx,
+                      feature,
+                      row,
+                      block,
+                      'highlight',
+                      rowInFeature,
+                    )
                   }
                 }
                 ctx.restore()

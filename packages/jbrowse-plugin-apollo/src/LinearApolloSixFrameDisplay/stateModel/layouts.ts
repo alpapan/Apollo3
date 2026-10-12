@@ -2,6 +2,7 @@
 
 import type { AnnotationFeature } from '@apollo-annotation/mst'
 import type PluginManager from '@jbrowse/core/PluginManager'
+import type { Assembly } from '@jbrowse/core/assemblyManager/assembly'
 import type { AnyConfigurationSchemaType } from '@jbrowse/core/configuration'
 import {
   type AbstractSessionModel,
@@ -11,7 +12,6 @@ import {
 import { addDisposer, isAlive } from '@jbrowse/mobx-state-tree'
 import { autorun, observable } from 'mobx'
 
-import type { ApolloSessionModel } from '../../session'
 import { looksLikeGene } from '../../util/glyphUtils'
 import { geneGlyph } from '../glyphs/GeneGlyph'
 
@@ -45,7 +45,9 @@ export function layoutsModelFactory(
         const { assemblyManager } =
           self.session as unknown as AbstractSessionModel
         return self.lgv.displayedRegions.map((region) => {
-          const assembly = assemblyManager.get(region.assemblyName)
+          const assembly = assemblyManager.get(region.assemblyName) as
+            | Assembly
+            | undefined
           let min: number | undefined
           let max: number | undefined
           const { end, refName, start } = region
@@ -101,7 +103,9 @@ export function layoutsModelFactory(
         const { assemblyManager } =
           self.session as unknown as AbstractSessionModel
         return self.lgv.displayedRegions.map((region, idx) => {
-          const assembly = assemblyManager.get(region.assemblyName)
+          const assembly = assemblyManager.get(region.assemblyName) as
+            | Assembly
+            | undefined
           const featureLayout = new Map<number, LayoutRow[]>()
           const minMax = self.featuresMinMax[idx]
           if (!minMax) {
@@ -228,9 +232,9 @@ export function layoutsModelFactory(
                 return
               }
               for (const region of self.regions) {
-                const assembly = (
-                  self.session as unknown as ApolloSessionModel
-                ).apolloDataStore.assemblies.get(region.assemblyName)
+                const assembly = self.session.apolloDataStore.assemblies.get(
+                  region.assemblyName,
+                )
                 const ref = assembly?.getByRefName(region.refName)
                 const features = ref?.features
                 if (!features) {

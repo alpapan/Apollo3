@@ -6,7 +6,11 @@ import {
 } from '@jbrowse/core/util'
 import type { ContentBlock } from '@jbrowse/core/util/blockTypes'
 
-import { MergeTranscripts } from '../../components'
+import {
+  AddCodingSequence,
+  DuplicateTranscript,
+  MergeTranscripts,
+} from '../../components'
 import {
   isCDSFeature,
   isExonFeature,
@@ -15,8 +19,8 @@ import {
 import type { LinearApolloDisplay } from '../stateModel'
 
 import { boxGlyph } from './BoxGlyph'
-import type { Glyph, LayoutRow } from './Glyph'
-import { drawHighlight, getFeatureBox, getLeftPx } from './util'
+import type { Glyph, LayoutRow, OverlayType } from './Glyph'
+import { drawOverlayBox, getFeatureBox, getLeftPx } from './util'
 
 function* range(start: number, stop: number, step = 1): Generator<number> {
   if (start === stop) {
@@ -117,25 +121,33 @@ function draw(
   block: ContentBlock,
 ) {
   drawTranscriptLine(display, ctx, transcript, row, block)
-  const { apolloRowHeight, selectedFeature } = display
+  const { selectedFeature } = display
   if (isSelectedFeature(transcript, selectedFeature)) {
-    const [top, left, width] = getFeatureBox(display, transcript, row, block)
-    const height = apolloRowHeight * getRowCount(display, transcript)
-    drawHighlight(display, ctx, left, top, width, height, true)
+    drawOverlay(display, ctx, transcript, row, block, 'select')
   }
 }
 
-function drawHover(
+function drawOverlay(
   display: LinearApolloDisplay,
   overlayCtx: CanvasRenderingContext2D,
   transcript: AnnotationFeature,
   row: number,
   block: ContentBlock,
+  overlayType: OverlayType,
 ) {
   const { apolloRowHeight } = display
   const [top, left, width] = getFeatureBox(display, transcript, row, block)
   const height = apolloRowHeight * getRowCount(display, transcript)
-  drawHighlight(display, overlayCtx, left, top, width, height)
+  drawOverlayBox(
+    display,
+    overlayCtx,
+    left,
+    top,
+    width,
+    height,
+    transcript,
+    overlayType,
+  )
 }
 
 function getLayout(display: LinearApolloDisplay, feature: AnnotationFeature) {
@@ -193,11 +205,11 @@ function getLayout(display: LinearApolloDisplay, feature: AnnotationFeature) {
 
 function getContextMenuItems(
   display: LinearApolloDisplay,
-  feature: AnnotationFeature,
+  transcript: AnnotationFeature,
 ): MenuItem[] {
   const { changeManager, regions, selectedFeature, session } = display
   const [region] = regions
-  const currentAssemblyId = display.getAssemblyId(region.assemblyName)
+  const currentAssemblyId = display.getAssemblyId(region.assemblyName) as string
   const menuItems: MenuItem[] = []
   if (isSessionModelWithWidgets(session)) {
     menuItems.splice(1, 0, {
@@ -207,7 +219,7 @@ function getContextMenuItems(
           'ApolloTranscriptDetails',
           'apolloTranscriptDetails',
           {
-            feature,
+            feature: transcript,
             assembly: currentAssemblyId,
             changeManager,
             refName: region.refName,
@@ -217,29 +229,83 @@ function getContextMenuItems(
       },
     })
   }
-  menuItems.push({
-    label: 'Merge transcript',
-    onClick: () => {
-      ;(session as unknown as AbstractSessionModel).queueDialog(
-        (doneCallback) => [
-          MergeTranscripts,
-          {
-            session,
-            handleClose: () => {
-              doneCallback()
+  menuItems.push(
+    {
+      label: 'Merge transcript',
+      onClick: () => {
+        ;(session as unknown as AbstractSessionModel).queueDialog(
+          (doneCallback) => [
+            MergeTranscripts,
+            {
+              session,
+              handleClose: () => {
+                doneCallback()
+              },
+              changeManager,
+              sourceFeature: transcript,
+              sourceAssemblyId: currentAssemblyId,
+              selectedFeature,
+              setSelectedFeature: (feature?: AnnotationFeature) => {
+                display.setSelectedFeature(feature)
+              },
             },
-            changeManager,
-            sourceFeature: feature,
-            sourceAssemblyId: currentAssemblyId,
-            selectedFeature,
-            setSelectedFeature: (feature?: AnnotationFeature) => {
-              display.setSelectedFeature(feature)
-            },
-          },
-        ],
-      )
+          ],
+        )
+      },
     },
-  })
+    {
+      label: 'Duplicate feature',
+      onClick: () => {
+        ;(session as unknown as AbstractSessionModel).queueDialog(
+          (doneCallback) => [
+            DuplicateTranscript,
+            {
+              session,
+              handleClose: () => {
+                doneCallback()
+              },
+              changeManager,
+              sourceFeature: transcript,
+              sourceAssemblyId: currentAssemblyId,
+              selectedFeature,
+              setSelectedFeature: (feature?: AnnotationFeature) => {
+                display.setSelectedFeature(feature)
+              },
+            },
+          ],
+        )
+      },
+    },
+  )
+  const { children } = transcript
+  if (!children) {
+    return []
+  }
+  const cdsChildren = [...children.values()].filter((child) =>
+    isCDSFeature(child, session),
+  )
+  if (cdsChildren.length === 0) {
+    menuItems.push({
+      label: 'Add coding sequence',
+      onClick: () => {
+        ;(session as unknown as AbstractSessionModel).queueDialog(
+          (doneCallback) => [
+            AddCodingSequence,
+            {
+              session,
+              handleClose: () => {
+                doneCallback()
+              },
+              changeManager,
+              sourceFeature: transcript,
+              sourceAssemblyId: currentAssemblyId,
+              refName: region.refName,
+            },
+          ],
+        )
+      },
+    })
+  }
   return menuItems
 }
 
@@ -251,7 +317,7 @@ const { drawDragPreview } = boxGlyph
 export const transcriptGlyph: Glyph = {
   draw,
   drawDragPreview,
-  drawHover,
+  drawOverlay,
   getContextMenuItems,
   getLayout,
   isDraggable: false,
