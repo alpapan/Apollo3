@@ -34,6 +34,7 @@ import {
   type GetChangesResult,
   type RefNameAliases,
 } from './BackendDriver'
+import { changeNeedsApplying } from './changeNeedsApplying'
 
 export interface ApolloRefSeqResponse {
   _id: string
@@ -179,17 +180,10 @@ export class CollaborationServerDriver extends BackendDriver {
   }
 
   private haveDataForChange(change: FeatureChange): boolean {
-    const { assembly, changedIds } = change
-    const apolloAssembly = this.clientStore.assemblies.get(assembly)
-    if (!apolloAssembly) {
-      return false
-    }
-    for (const changedId of changedIds) {
-      if (this.clientStore.getFeature(changedId)) {
-        return true
-      }
-    }
-    return false
+    return changeNeedsApplying(change, {
+      assembly: (assemblyId) => this.clientStore.assemblies.has(assemblyId),
+      feature: (featureId) => Boolean(this.clientStore.getFeature(featureId)),
+    })
   }
 
   /**

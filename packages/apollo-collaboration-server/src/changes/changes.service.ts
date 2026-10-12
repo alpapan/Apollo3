@@ -36,6 +36,7 @@ import { Model, type QueryFilter, Types } from 'mongoose'
 import { CountersService } from '../counters/counters.service.js'
 import { MessagesGateway } from '../messages/messages.gateway.js'
 
+import { resolveBroadcastRefNames } from './broadcastRefNames.js'
 import { ChangeHandlersService } from './changeHandlers.service.js'
 import { FindChangeDto } from './dto/find-change.dto.js'
 
@@ -80,23 +81,13 @@ export class ChangesService {
     }
     // Get some info for later broadcasting, before any features are potentially
     // deleted
-    const refNames: string[] = []
+    let refNames: string[] = []
     if (isFeatureChange(change)) {
       // For broadcasting we need also refName
-      const { changedIds } = change
-      for (const changedId of changedIds) {
-        const featureDoc = await this.featureModel
-          .findOne({ allIds: changedId })
-          .exec()
-        if (featureDoc) {
-          const refSeqDoc = await this.refSeqModel
-            .findById(featureDoc.refSeq)
-            .exec()
-          if (refSeqDoc) {
-            refNames.push(refSeqDoc.name)
-          }
-        }
-      }
+      refNames = await resolveBroadcastRefNames(change, {
+        featureModel: this.featureModel,
+        refSeqModel: this.refSeqModel,
+      })
     }
 
     let changeDoc: ChangeDocument | undefined
