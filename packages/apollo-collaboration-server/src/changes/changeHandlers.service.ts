@@ -7,6 +7,8 @@ import {
   type ChangeDocument,
   Check,
   type CheckDocument,
+  CheckResult,
+  type CheckResultDocument,
   Feature,
   type FeatureDocument,
   File,
@@ -90,6 +92,8 @@ export class ChangeHandlersService implements ChangeHandlers {
     private readonly changeModel: Model<ChangeDocument>,
     @InjectModel(Check.name)
     private readonly checkModel: Model<CheckDocument>,
+    @InjectModel(CheckResult.name)
+    private readonly checkResultModel: Model<CheckResultDocument>,
     private readonly filesService: FilesService,
     private readonly countersService: CountersService,
     private readonly pluginsService: PluginsService,
@@ -222,7 +226,7 @@ export class ChangeHandlersService implements ChangeHandlers {
     change: DeleteFeatureChange,
     context: { session: ClientSession; user: string },
   ) {
-    const { featureModel } = this
+    const { checkResultModel, featureModel } = this
     const { changes } = change
     const { session } = context
 
@@ -230,6 +234,14 @@ export class ChangeHandlersService implements ChangeHandlers {
     let idsToIndex: string[] | undefined
     if (INDEXED_IDS) {
       idsToIndex = INDEXED_IDS.split(',')
+    }
+
+    // A check result lives only as long as the features it names. deleteMany
+    // goes through the CheckResult model's hooks, which tell connected clients.
+    const deleteCheckResults = async (featureIds: string[]) => {
+      await checkResultModel
+        .deleteMany({ ids: { $in: featureIds } })
+        .session(session)
     }
 
     for (const c of changes) {
@@ -252,6 +264,7 @@ export class ChangeHandlersService implements ChangeHandlers {
           )
         }
         await featureModel.findByIdAndDelete(featureDoc._id)
+        await deleteCheckResults(featureDoc.allIds)
         this.logger.debug(
           `Feature "${deletedFeature._id}" deleted from document "${featureDoc.id}". Whole document deleted.`,
         )
@@ -267,6 +280,7 @@ export class ChangeHandlersService implements ChangeHandlers {
       featureDoc.allIds = featureDoc.allIds.filter(
         (id) => !deletedIds.includes(id),
       )
+      await deleteCheckResults(deletedIds)
       const indexedIds = change.getIndexedIds(featureDoc, idsToIndex)
       if (featureDoc.indexedIds) {
         if (indexedIds.length > 0) {
@@ -947,7 +961,7 @@ export class ChangeHandlersService implements ChangeHandlers {
     }
   }
 
-  // ── private helpers (moved from FromFileBaseChange / AddAssemblyFromFileChange) ──
+  // -- private helpers (moved from FromFileBaseChange / AddAssemblyFromFileChange) --
 
   private getIndexedIds(
     feature: AnnotationFeatureSnapshot | Feature,
@@ -1283,7 +1297,7 @@ export class ChangeHandlersService implements ChangeHandlers {
     await this.addRefSeqIntoDb(fileDoc, assembly, user)
   }
 
-  // ── handlers for non-feature changes ──
+  // -- handlers for non-feature changes --
 
   async DeleteAssemblyChange(
     change: DeleteAssemblyChange,
