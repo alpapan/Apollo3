@@ -37,6 +37,7 @@ import { addTopLevelAdminMenus } from '../menus/topLevelMenuAdmin'
 import type { Collaborator } from '../session'
 import type { ApolloRootModel } from '../types'
 import { createFetchErrorMessage } from '../util'
+import { createBatcher } from '../util/createBatcher'
 
 import { AuthTypeSelector } from './components/AuthTypeSelector'
 import type { ApolloInternetAccountConfigModel } from './configSchema'
@@ -49,6 +50,10 @@ interface AuthType {
 type Role = 'admin' | 'user' | 'readOnly' | 'none'
 
 const inWebWorker = typeof sessionStorage === 'undefined'
+
+// Window over which incoming check-result messages are collected before they
+// are applied to the data store together.
+const CHECK_RESULT_BATCH_MS = 100
 
 const stateModelFactory = (configSchema: ApolloInternetAccountConfigModel) => {
   return InternetAccount.named('ApolloInternetAccount')
@@ -393,8 +398,19 @@ const stateModelFactory = (configSchema: ApolloInternetAccountConfigModel) => {
         const user = getDecodedToken(token)
         const localSessionId = makeUserSessionId(user)
         const { socket } = self
-        const { addCheckResult, changeManager, deleteCheckResult } =
-          session.apolloDataStore
+        const { apolloDataStore } = session
+        const { applyCheckResultUpdates, changeManager } = apolloDataStore
+        // The server sends check results one message at a time. Applying each
+        // on arrival re-renders every check-result observer once per message,
+        // so updates are collected and applied together.
+        const checkResultBatcher = createBatcher<CheckResultUpdate>(
+          (updates) => {
+            if (isAlive(self) && isAlive(apolloDataStore)) {
+              applyCheckResultUpdates(updates)
+            }
+          },
+          CHECK_RESULT_BATCH_MS,
+        )
         socket.on('connect', () => {
           // No baseline yet, so there is nothing to be missing: this is the
           // first connect, and loadInitialState() is still fetching the
@@ -415,11 +431,7 @@ const stateModelFactory = (configSchema: ApolloInternetAccountConfigModel) => {
         })
         socket.on('COMMON', (message: ChangeMessage | CheckResultUpdate) => {
           if ('checkResult' in message) {
-            if (message.deleted) {
-              deleteCheckResult(message.checkResult._id)
-            } else {
-              addCheckResult(message.checkResult)
-            }
+            checkResultBatcher.add(message)
             return
           }
           // Save server last change sequence into session storage
