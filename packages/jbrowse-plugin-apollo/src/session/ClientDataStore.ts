@@ -157,6 +157,19 @@ export function clientDataStoreFactory(
       deleteCheckResult(checkResultId: string) {
         self.checkResults.delete(checkResultId)
       },
+      // Applies a run of check-result updates in order as one action, so
+      // observers of checkResults react once for the whole run.
+      applyCheckResultUpdates(
+        updates: readonly { checkResult: CheckResultSnapshot; deleted?: boolean }[],
+      ) {
+        for (const { checkResult, deleted } of updates) {
+          if (deleted) {
+            self.checkResults.delete(checkResult._id)
+          } else {
+            self.checkResults.put(checkResult)
+          }
+        }
+      },
       clearCheckResults() {
         self.checkResults.clear()
       },
