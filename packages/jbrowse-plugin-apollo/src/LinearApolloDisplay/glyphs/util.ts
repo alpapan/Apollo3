@@ -74,8 +74,28 @@ export function drawOverlayBox(
   if (!color) {
     return
   }
-  ctx.fillStyle = alpha(color, 0.3)
+  const fillStyle = overlayFillStyle(color)
+  if (!fillStyle) {
+    return
+  }
+  ctx.fillStyle = fillStyle
   ctx.fillRect(left, top, width, height)
+}
+
+/**
+ * The overlay fill for a colour at 0.3 alpha, or undefined when the colour
+ * cannot be parsed. A feature's `apollo_color` attribute is free text that any
+ * editor can set, so a value MUI cannot parse is skipped rather than allowed to
+ * throw inside the drawing pass.
+ */
+function overlayFillStyle(color: string): string | undefined {
+  let fillStyle: string
+  try {
+    fillStyle = alpha(color, 0.3)
+  } catch {
+    return undefined
+  }
+  return fillStyle.includes('NaN') ? undefined : fillStyle
 }
 
 /**
