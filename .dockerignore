@@ -1,3 +1,6 @@
+.git
+.pixi
+.husky/_
 .pnp.*
 .yarn/*
 !.yarn/patches
