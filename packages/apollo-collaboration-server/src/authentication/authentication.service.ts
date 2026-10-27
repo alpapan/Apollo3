@@ -325,10 +325,10 @@ export class AuthenticationService {
 
   /**
    * Exchange a curatorium-backend-signed HS256 JWT for an Apollo-minted
-   * HS256 JWT. The inner JWT carries ORCID, role, and id1 tracking claims;
-   * we honour the role verbatim (no first-user-becomes-admin fallback -
-   * the role is set by curatorium-backend's CURATORIUM_APOLLO_ADMIN_ORCIDS
-   * allowlist).
+   * HS256 JWT. The inner JWT carries ORCID, role, and id1 tracking claims.
+   * There is no first-user-becomes-admin fallback: the role is derived by
+   * curatorium-backend from the person's Curatorium roles and is applied to
+   * the stored user on every exchange, up or down.
    */
   async exchangeCuratoriumToken(innerJwt: string) {
     const secret = this.configService.get('CURATORIUM_EXCHANGE_SECRET', {
@@ -380,7 +380,10 @@ export class AuthenticationService {
 
     let user = await this.usersService.findByEmail(payload.email)
     if (user) {
+      // The role sent is applied on every exchange, up or down, so Apollo's
+      // stored role follows curatorium-backend's derivation at each sign-in.
       const shouldResync =
+        (user.role as Role) !== role ||
         user.lastId1Kid !== payload.id1_kid ||
         user.lastId1BootId !== payload.id1_boot_id
       if (shouldResync) {
