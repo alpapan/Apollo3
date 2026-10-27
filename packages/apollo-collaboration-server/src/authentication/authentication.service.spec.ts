@@ -125,29 +125,66 @@ describe('AuthenticationService', () => {
     })
   })
 
-  it('exchangeCuratoriumToken_doesNotResyncRoleWhenKidAndBootIdMatch', async () => {
-    await userModel.create({ username: USERNAME, email: EMAIL, role: 'user' })
-    Object.assign(userModel.docs[0] ?? {}, {
-      lastId1Kid: 'kid-1',
-      lastId1BootId: 'boot-1',
-    })
+  it.each([
+    ['user', 'admin'],
+    ['readOnly', 'admin'],
+    ['readOnly', 'user'],
+    ['admin', 'user'],
+    ['admin', 'readOnly'],
+    ['user', 'readOnly'],
+  ])(
+    'exchangeCuratoriumToken_appliesSentRole stored %s becomes %s with kid and boot id unchanged',
+    async (stored, sent) => {
+      await userModel.create({ username: USERNAME, email: EMAIL, role: stored })
+      Object.assign(userModel.docs[0] ?? {}, {
+        lastId1Kid: 'kid-1',
+        lastId1BootId: 'boot-1',
+      })
 
-    // The claim says admin, but kid and boot id are unchanged, so the stored
-    // role stays as it was.
-    const result = await service.exchangeCuratoriumToken(
-      signInnerJwt(
-        buildInnerClaims({
-          role: 'admin',
-          id1_kid: 'kid-1',
-          id1_boot_id: 'boot-1',
-        }),
-      ),
-    )
+      const result = await service.exchangeCuratoriumToken(
+        signInnerJwt(
+          buildInnerClaims({
+            role: sent,
+            id1_kid: 'kid-1',
+            id1_boot_id: 'boot-1',
+          }),
+        ),
+      )
 
-    expect(userModel.docs).toHaveLength(1)
-    expect(userModel.docs[0]?.role).toBe('user')
-    expect(decode(result.token).role).toBe('user')
-  })
+      expect(userModel.docs).toHaveLength(1)
+      expect(userModel.docs[0]).toMatchObject({
+        role: sent,
+        lastId1Kid: 'kid-1',
+        lastId1BootId: 'boot-1',
+      })
+      expect(decode(result.token).role).toBe(sent)
+    },
+  )
+
+  it.each(['admin', 'user', 'readOnly'])(
+    'exchangeCuratoriumToken_keepsRole %s when the sent role is the same',
+    async (role) => {
+      await userModel.create({ username: USERNAME, email: EMAIL, role })
+      Object.assign(userModel.docs[0] ?? {}, {
+        lastId1Kid: 'kid-1',
+        lastId1BootId: 'boot-1',
+      })
+
+      const result = await service.exchangeCuratoriumToken(
+        signInnerJwt(
+          buildInnerClaims({
+            role,
+            id1_kid: 'kid-1',
+            id1_boot_id: 'boot-1',
+          }),
+        ),
+      )
+
+      expect(userModel.docs).toHaveLength(1)
+      expect(userModel.docs[0]?.role).toBe(role)
+      expect(decode(result.token).role).toBe(role)
+    },
+  )
 
   it.each([
     ['kid changes', 'admin', 'kid-NEW', 'boot-1'],
