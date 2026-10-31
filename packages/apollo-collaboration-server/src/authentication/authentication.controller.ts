@@ -74,6 +74,11 @@ export class AuthenticationController {
     return this.authService.exchangeCuratoriumToken(token)
   }
 
+  @Post('purge')
+  async curatoriumPurge(@Body() { token }: { token: string }) {
+    return this.authService.purgeCuratoriumUser(token)
+  }
+
   @Get(':id')
   async fallbackLogin(
     @Param('id') id: string,
