@@ -35,6 +35,7 @@ interface ConfigValues {
   GOOGLE_CLIENT_ID_FILE?: string
   ALLOW_GUEST_USER: boolean
   DEFAULT_NEW_USER_ROLE: Role
+  ALLOW_ROOT_USER: boolean
   ROOT_USER_PASSWORD: string
   CURATORIUM_EXCHANGE_SECRET: string
 }
@@ -252,7 +253,18 @@ export class AuthenticationService {
   }
 
   async rootLogin(password: string) {
-    if (password === this.configService.get('ROOT_USER_PASSWORD')) {
+    const allowRootUser = this.configService.get('ALLOW_ROOT_USER', {
+      infer: true,
+    })
+    const rootPassword = this.configService.get('ROOT_USER_PASSWORD', {
+      infer: true,
+    })
+    if (
+      allowRootUser &&
+      typeof rootPassword === 'string' &&
+      rootPassword !== '' &&
+      password === rootPassword
+    ) {
       return this.logIn(ROOT_USER_NAME, ROOT_USER_EMAIL)
     }
     throw new UnauthorizedException('Invalid password for ROOT user')
