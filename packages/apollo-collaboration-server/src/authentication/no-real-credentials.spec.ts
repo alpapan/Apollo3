@@ -51,7 +51,6 @@ const CURATORIUM_AUTHORED_PATHS = [
   'packages/apollo-cli/src/utils.ts',
   'packages/apollo-collaboration-server/package.json',
   'packages/apollo-collaboration-server/src/app.module.ts',
-  'packages/apollo-collaboration-server/src/authentication/authentication.controller.spec.ts',
   'packages/apollo-collaboration-server/src/authentication/authentication.controller.ts',
   'packages/apollo-collaboration-server/src/authentication/authentication.service.spec.ts',
   'packages/apollo-collaboration-server/src/authentication/authentication.service.ts',
