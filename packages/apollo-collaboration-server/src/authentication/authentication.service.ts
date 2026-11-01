@@ -48,6 +48,17 @@ const ALLOWED_EXCHANGE_ROLES: ReadonlySet<Role> = new Set([
 const REPLAY_TTL_MS = 120_000
 const REPLAY_CAPACITY = 1000
 const CLOCK_TOLERANCE_SECONDS = 5
+const PURGE_PURPOSE = 'purge'
+// The Apollo email of a Curatorium account: its ORCID iD at this domain.
+const CURATORIUM_USER_EMAIL =
+  /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]@apollo\.curatorium\.local$/
+
+interface PurgeJwtPayload {
+  purpose?: unknown
+  email?: unknown
+  jti?: unknown
+  exp?: unknown
+}
 
 interface InnerJwtPayload {
   username: string
@@ -365,30 +376,7 @@ export class AuthenticationService {
     }
     const role = payload.role as Role
 
-    // Replay defence: TTL purge, then size-cap (FIFO), then check + record.
-    // Relies on `Map` insertion-order iteration (ES6 guarantee) for FIFO:
-    // oldest entry first, so we can break on the first non-expired entry.
-    const now = Date.now()
-    for (const [jti, storedAt] of this.seenJtis) {
-      if (now - storedAt <= REPLAY_TTL_MS) {
-        break
-      }
-      this.seenJtis.delete(jti)
-    }
-    if (this.seenJtis.has(payload.jti)) {
-      throw new UnauthorizedException('Token replay')
-    }
-    while (this.seenJtis.size >= REPLAY_CAPACITY) {
-      // Narrow Map.keys().next().value (typed as `any` under tseslint's
-      // strict-type-checked) to string | undefined so the delete below
-      // doesn't trip `no-unsafe-argument`.
-      const oldest: string | undefined = this.seenJtis.keys().next().value
-      if (oldest === undefined) {
-        break
-      }
-      this.seenJtis.delete(oldest)
-    }
-    this.seenJtis.set(payload.jti, now)
+    this.recordJti(payload.jti)
 
     let user = await this.usersService.findByEmail(payload.email)
     if (user) {
@@ -452,5 +440,82 @@ export class AuthenticationService {
       },
       { expSeconds },
     )
+  }
+
+  /**
+   * Delete the Apollo user of a purged Curatorium account. The token is an
+   * HS256 JWT signed by curatorium-backend with CURATORIUM_EXCHANGE_SECRET,
+   * carrying purpose 'purge', the user's Apollo email, a fresh jti and an exp.
+   * Only an email of the form <orcid>\@apollo.curatorium.local is accepted, so
+   * the root, guest and any non-Curatorium user can never be named. Answers
+   * 'absent' for a user that is not stored, so a repeated purge succeeds.
+   */
+  async purgeCuratoriumUser(purgeJwt: string) {
+    const secret = this.configService.get('CURATORIUM_EXCHANGE_SECRET', {
+      infer: true,
+    })
+    let payload: PurgeJwtPayload
+    try {
+      payload = this.jwtService.verify<PurgeJwtPayload>(purgeJwt, {
+        secret,
+        algorithms: ['HS256'],
+        clockTolerance: CLOCK_TOLERANCE_SECONDS,
+      })
+    } catch {
+      throw new UnauthorizedException('Invalid purge token')
+    }
+
+    // Rejected before the replay record is touched, as in the exchange.
+    if (
+      payload.purpose !== PURGE_PURPOSE ||
+      typeof payload.jti !== 'string' ||
+      payload.jti === '' ||
+      typeof payload.exp !== 'number'
+    ) {
+      throw new UnauthorizedException('Invalid purge token')
+    }
+    if (
+      typeof payload.email !== 'string' ||
+      !CURATORIUM_USER_EMAIL.test(payload.email)
+    ) {
+      throw new UnauthorizedException('Purge refused for this email')
+    }
+
+    this.recordJti(payload.jti)
+
+    const deleted = await this.usersService.deleteByEmail(payload.email)
+    const status = deleted === null ? 'absent' : 'deleted'
+    this.logger.log(`Purge of "${payload.email}": ${status}`)
+    return { status }
+  }
+
+  /**
+   * Replay defence shared by the exchange and the purge: TTL purge, then
+   * size-cap (FIFO), then check + record. Relies on `Map` insertion-order
+   * iteration (ES6 guarantee) for FIFO: oldest entry first, so we can break on
+   * the first non-expired entry.
+   */
+  private recordJti(jti: string) {
+    const now = Date.now()
+    for (const [seenJti, storedAt] of this.seenJtis) {
+      if (now - storedAt <= REPLAY_TTL_MS) {
+        break
+      }
+      this.seenJtis.delete(seenJti)
+    }
+    if (this.seenJtis.has(jti)) {
+      throw new UnauthorizedException('Token replay')
+    }
+    while (this.seenJtis.size >= REPLAY_CAPACITY) {
+      // Narrow Map.keys().next().value (typed as `any` under tseslint's
+      // strict-type-checked) to string | undefined so the delete below
+      // doesn't trip `no-unsafe-argument`.
+      const oldest: string | undefined = this.seenJtis.keys().next().value
+      if (oldest === undefined) {
+        break
+      }
+      this.seenJtis.delete(oldest)
+    }
+    this.seenJtis.set(jti, now)
   }
 }
