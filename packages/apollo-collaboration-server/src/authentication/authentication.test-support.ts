@@ -98,11 +98,14 @@ export function signInnerJwt(claims: object, secret = TEST_EXCHANGE_SECRET) {
  * ConfigService, MessagesGateway and PluginsService. Only the user model is
  * replaced.
  */
-export function makeAuthenticationService() {
+export function makeAuthenticationService(
+  extraConfig: Record<string, unknown> = {},
+) {
   const userModel = new InMemoryUserModel()
   const configService = new ConfigService({
     CURATORIUM_EXCHANGE_SECRET: TEST_EXCHANGE_SECRET,
     DEFAULT_NEW_USER_ROLE: Role.User,
+    ...extraConfig,
   })
   const usersService = new UsersService(
     userModel as unknown as Model<UserDocument>,

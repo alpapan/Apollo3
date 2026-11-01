@@ -30,6 +30,10 @@ import {
   RefSeqDocToGFF3HeaderStream,
 } from './transforms.js'
 
+// Matches the 300 second TTL index on the Export schema and the lifetime the
+// export controller documents for getID.
+const EXPORT_ID_LIFETIME_MS = 5 * 60 * 1000
+
 @Injectable()
 export class ExportService {
   constructor(
@@ -69,6 +73,11 @@ export class ExportService {
   ): Promise<[Readable, string]> {
     const exportDoc = await this.exportModel.findById(exportID)
     if (!exportDoc) {
+      throw new NotFoundException()
+    }
+    const createdAt = exportDoc.get('createdAt') as Date
+    const ageMs = Date.now() - createdAt.getTime()
+    if (ageMs > EXPORT_ID_LIFETIME_MS) {
       throw new NotFoundException()
     }
     const { fastaWidth, includeFASTA } = opts
