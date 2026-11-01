@@ -27,7 +27,8 @@ export interface StoredUser {
 
 /**
  * Stands in for the Mongoose user model, the database boundary. It supports
- * only the model calls that UsersService makes on the token-exchange path.
+ * only the model calls that UsersService makes on the token-exchange and purge
+ * paths.
  */
 export class InMemoryUserModel {
   readonly docs: StoredUser[] = []
@@ -50,6 +51,19 @@ export class InMemoryUserModel {
     const doc: StoredUser = { ...dto, id: `mongo-id-${this.nextId++}` }
     this.docs.push(doc)
     return Promise.resolve(doc)
+  }
+
+  findOneAndDelete(filter: { email: string }) {
+    return {
+      exec: () => {
+        const doc = this.docs.find((d) => d.email === filter.email)
+        if (!doc) {
+          return Promise.resolve(null)
+        }
+        this.docs.splice(this.docs.indexOf(doc), 1)
+        return Promise.resolve(doc)
+      },
+    }
   }
 
   findByIdAndUpdate(id: string, update: Partial<StoredUser>) {
