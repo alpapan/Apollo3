@@ -57,6 +57,10 @@ export class UsersService {
     return this.userModel.findOne({ email }).exec()
   }
 
+  async deleteByEmail(email: string) {
+    return this.userModel.findOneAndDelete({ email }).exec()
+  }
+
   async findByRole(role: Role) {
     return this.userModel.findOne({ role }).sort('createdAt').exec()
   }
