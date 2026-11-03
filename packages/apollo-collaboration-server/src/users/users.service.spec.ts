@@ -11,12 +11,14 @@ import { UsersService } from './users.service.js'
 
 describe('UsersService', () => {
   let service: UsersService
-  let findByIdAndUpdateSpy: jest.Mock
-  let execSpy: jest.Mock
+  let findByIdAndUpdateSpy: jest.Mock<() => unknown>
+  let execSpy: jest.Mock<() => Promise<unknown>>
 
   beforeEach(async () => {
-    execSpy = jest.fn().mockResolvedValue({})
-    findByIdAndUpdateSpy = jest.fn().mockReturnValue({ exec: execSpy })
+    execSpy = jest.fn<() => Promise<unknown>>().mockResolvedValue({})
+    findByIdAndUpdateSpy = jest
+      .fn<() => unknown>()
+      .mockReturnValue({ exec: execSpy })
 
     const userModel = {
       findByIdAndUpdate: findByIdAndUpdateSpy,
@@ -49,7 +51,7 @@ describe('UsersService', () => {
     expect(findByIdAndUpdateSpy).toHaveBeenCalledWith(
       'user-id-1',
       { role: 'admin', lastId1Kid: 'kid-A', lastId1BootId: 'boot-X' },
-      { new: true },
+      { returnDocument: 'after' },
     )
     expect(execSpy).toHaveBeenCalled()
   })

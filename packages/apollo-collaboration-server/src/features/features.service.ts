@@ -1,26 +1,38 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
+import { Readable } from 'node:stream'
+import { ReadableStream } from 'node:stream/web'
+
 import {
   Feature,
   type FeatureDocument,
   RefSeq,
   type RefSeqDocument,
 } from '@apollo-annotation/schemas'
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import {
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  forwardRef,
+} from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
 
 import { ChecksService } from '../checks/checks.service.js'
 import type { FeatureRangeSearchDto } from '../entity/gff3Object.dto.js'
+import { concatStreams } from '../utils/concatStreams.js'
 
 import type {
   FeatureCountRequest,
   GetByIndexedIdRequest,
 } from './dto/feature.dto.js'
+import { CheckFeatureStream, DocToJSONArrayStream } from './transforms.js'
 
 @Injectable()
 export class FeaturesService {
   constructor(
-    private readonly checksService: ChecksService,
+    @Inject(forwardRef(() => ChecksService))
+    private readonly checksService: Readonly<ChecksService>,
     @InjectModel(Feature.name)
     private readonly featureModel: Model<FeatureDocument>,
     @InjectModel(RefSeq.name)
@@ -71,13 +83,13 @@ export class FeaturesService {
 
   async getByIndexedId(getByIndexedIdRequest: GetByIndexedIdRequest) {
     const { assemblies, id, topLevel } = getByIndexedIdRequest
-    const refSeqsQuery: { refSeq?: RefSeqDocument[] } = {}
+    const refSeqsQuery: { refSeq?: RefSeqDocument['_id'][] } = {}
     if (assemblies) {
       const assemblyIds = assemblies.split(',')
       const refSeqs = await this.refSeqModel
         .find({ assembly: assemblyIds })
         .exec()
-      refSeqsQuery.refSeq = refSeqs
+      refSeqsQuery.refSeq = refSeqs.map((refSeq) => refSeq._id)
     }
     const topLevelFeatures = await this.featureModel
       .find({ indexedIds: id, ...refSeqsQuery })
@@ -156,8 +168,8 @@ export class FeaturesService {
       .exec()
 
     if (!topLevelFeature) {
-      const errMsg = `ERROR: The following featureId was not found in database ='${featureId}'`
-      this.logger.error(errMsg)
+      const errMsg = `The following featureId was not found in database ='${featureId}'`
+      this.logger.warn(errMsg)
       throw new NotFoundException(errMsg)
     }
 
@@ -168,11 +180,13 @@ export class FeaturesService {
       topLevel,
     )
     if (!foundFeature) {
-      const errMsg = 'ERROR when searching feature by featureId'
-      this.logger.error(errMsg)
+      const errMsg = `Feature "${featureId}" not found in its top-level feature`
+      this.logger.warn(errMsg)
       throw new NotFoundException(errMsg)
     }
-    this.logger.debug(`Feature found: ${JSON.stringify(foundFeature)}`)
+    this.logger.debug(
+      `Feature found: "${foundFeature._id.toString()}" (${foundFeature.type})`,
+    )
     return foundFeature
   }
 
@@ -188,11 +202,11 @@ export class FeaturesService {
     topLevel?: boolean,
     parent?: Feature | null,
   ): Feature | null {
-    this.logger.verbose(`Entry=${JSON.stringify(feature)}`)
+    this.logger.debug(`Checking feature "${feature._id.toString()}"`)
 
     if (feature._id.equals(featureId)) {
       this.logger.debug(
-        `Top level featureId matches in object ${JSON.stringify(feature)}`,
+        `Top level featureId matches in feature "${feature._id.toString()}"`,
       )
       if (topLevel && parent) {
         return parent
@@ -223,18 +237,67 @@ export class FeaturesService {
 
   async findByRange(searchDto: FeatureRangeSearchDto) {
     const featureDocs = await this.featureModel
-      .find({
-        refSeq: searchDto.refSeq,
-        min: { $lte: searchDto.end },
-        max: { $gte: searchDto.start },
-        status: 0,
-      })
+      .find(this.byRangeQuery(searchDto))
       .exec()
     for (const featureDoc of featureDocs) {
       await this.checksService.checkFeature(featureDoc)
     }
     const checkResults = await this.checksService.findByRange(searchDto)
     return [featureDocs, checkResults]
+  }
+
+  /**
+   * Same as findByRange, but streams the response instead of resolving the
+   * full feature and checkResult arrays in memory first.
+   * @param searchDto - range
+   * @returns a stream of the JSON body `[[...features],[...checkResults]]`
+   */
+  findByRangeStream(searchDto: FeatureRangeSearchDto): Readable {
+    const featuresStream = Readable.toWeb(
+      this.featureModel.find(this.byRangeQuery(searchDto)).cursor(),
+    )
+      .pipeThrough(new CheckFeatureStream(this.checksService))
+      .pipeThrough(new DocToJSONArrayStream())
+
+    const checkResultsStream = Readable.toWeb(
+      this.checksService.findByRangeCursor(searchDto),
+    ).pipeThrough(new DocToJSONArrayStream())
+
+    const openBracket = new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue('[')
+        controller.close()
+      },
+    })
+    const comma = new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue(',')
+        controller.close()
+      },
+    })
+    const closeBracket = new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue(']')
+        controller.close()
+      },
+    })
+
+    return concatStreams([
+      openBracket,
+      featuresStream,
+      comma,
+      checkResultsStream,
+      closeBracket,
+    ])
+  }
+
+  private byRangeQuery(searchDto: FeatureRangeSearchDto) {
+    return {
+      refSeq: searchDto.refSeq,
+      min: { $lte: searchDto.end },
+      max: { $gte: searchDto.start },
+      status: 0,
+    }
   }
 
   async checkFeature(featureId: string, checkTimestamps = true) {
@@ -252,7 +315,10 @@ export class FeaturesService {
       .find({ assembly: assemblyIds })
       .exec()
     return this.featureModel
-      .find({ $text: { $search: `"${term}"` }, refSeq: refSeqs })
+      .find({
+        $text: { $search: `"${term}"` },
+        refSeq: refSeqs.map((refSeq) => refSeq._id),
+      })
       .exec()
   }
 }

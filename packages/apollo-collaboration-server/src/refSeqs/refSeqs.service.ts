@@ -4,7 +4,7 @@ import {
   RefSeq,
   type RefSeqDocument,
 } from '@apollo-annotation/schemas'
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model, Types } from 'mongoose'
 
@@ -20,8 +20,6 @@ export class RefSeqsService {
     @InjectModel(Assembly.name)
     private readonly assemblyModel: Model<AssemblyDocument>,
   ) {}
-
-  private readonly logger = new Logger(RefSeqsService.name)
 
   create(createRefSeqDto: CreateRefSeqDto) {
     return this.refSeqModel.create(createRefSeqDto)

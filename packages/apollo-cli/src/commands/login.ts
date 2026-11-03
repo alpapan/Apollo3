@@ -3,18 +3,17 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import EventEmitter from 'node:events'
 import * as http from 'node:http'
-import path from 'node:path'
 import * as querystring from 'node:querystring'
 
+import { confirm } from '@inquirer/prompts'
 import { Errors, Flags, ux } from '@oclif/core'
 import open from 'open'
 import { fetch } from 'undici'
 
-import { ApolloConf, KEYS } from '../ApolloConf.js'
+import { type ApolloConf, KEYS } from '../ApolloConf.js'
 import { BaseCommand } from '../baseCommand.js'
 import {
   type UserCredentials,
-  basicCheckConfig,
   createFetchErrorMessage,
   localhostToAddress,
   waitFor,
@@ -73,17 +72,8 @@ need to execute this command again unless the token has expired. To setup a new 
   public async run(): Promise<void> {
     const { flags } = await this.parse(Login)
 
-    let configFile = flags['config-file']
-    if (configFile === undefined) {
-      configFile = path.join(this.config.configDir, 'config.yml')
-    }
-
-    let profileName = flags.profile
-    if (profileName === undefined) {
-      profileName = process.env.APOLLO_PROFILE ?? 'default'
-    }
-    basicCheckConfig(configFile, profileName)
-    const config: ApolloConf = new ApolloConf(configFile)
+    const profileName = flags.profile ?? process.env.APOLLO_PROFILE ?? 'default'
+    const config = this.getConfig()
     const accessType: string = config.get(`${profileName}.accessType`) as string
     const address: string =
       flags.address ?? (config.get(`${profileName}.address`) as string)
@@ -139,9 +129,10 @@ need to execute this command again unless the token has expired. To setup a new 
     if (!accessToken) {
       return
     }
-    const reAuthenticate = await ux.confirm(
-      "You're already logged. Do you want to re-authenticate? (y/n)",
-    )
+    const reAuthenticate = await confirm({
+      message: "You're already logged in. Do you want to re-authenticate?",
+      default: true,
+    })
     if (!reAuthenticate) {
       this.exit(0)
     }

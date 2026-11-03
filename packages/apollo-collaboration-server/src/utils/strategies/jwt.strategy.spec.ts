@@ -53,7 +53,7 @@ function runStrategy(
   })
 }
 
-describe('JwtStrategy aud/iss enforcement (Phase 1.5 Part A)', () => {
+describe('JwtStrategy aud/iss enforcement', () => {
   describe('regression guard - must pass BEFORE and AFTER the hardening', () => {
     it('accepts token with matching aud + iss', async () => {
       const strategy = new JwtStrategy(makeConfigService())

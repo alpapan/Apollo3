@@ -32,6 +32,8 @@ import type { SubmitOpts } from '../../ChangeManager'
 import {
   BackendDriver,
   type ChangeDocument,
+  type GetChangesOpts,
+  type GetChangesResult,
   type RefNameAliases,
 } from '../BackendDriver'
 
@@ -72,7 +74,9 @@ export class LocalDriver extends BackendDriver {
   async getSequence(region: Region): Promise<{ seq: string; refSeq: string }> {
     const session = getSession(this.clientStore)
     const { assemblyManager } = session
-    const assembly = await assemblyManager.waitForAssembly(region.assemblyName)
+    const assembly = (await assemblyManager.waitForAssembly(
+      region.assemblyName,
+    )) as Assembly | undefined
     if (!assembly) {
       throw new Error(`Assembly not found: "${region.assemblyName}"`)
     }
@@ -94,7 +98,10 @@ export class LocalDriver extends BackendDriver {
       undefined,
       pluginManager,
     ) as BaseSequenceAdapter
-    const seq = await adapter.getSequence(region)
+    const seq = await adapter.getSequence({
+      ...region,
+      refName: assembly.getSeqAdapterRefName(region.refName),
+    })
     if (!seq) {
       throw new Error(`Sequence not found: ${JSON.stringify(region)}`)
     }
@@ -104,7 +111,9 @@ export class LocalDriver extends BackendDriver {
   async getRegions(assemblyName: string): Promise<Region[]> {
     const session = getSession(this.clientStore)
     const { assemblyManager } = session
-    const assembly = await assemblyManager.waitForAssembly(assemblyName)
+    const assembly = (await assemblyManager.waitForAssembly(assemblyName)) as
+      | Assembly
+      | undefined
     if (!assembly) {
       throw new Error(`Assembly not found: "${assemblyName}"`)
     }
@@ -122,7 +131,9 @@ export class LocalDriver extends BackendDriver {
   async getRefNameAliases(assemblyName: string): Promise<RefNameAliases[]> {
     const session = getSession(this.clientStore)
     const { assemblyManager } = session
-    const assembly = await assemblyManager.waitForAssembly(assemblyName)
+    const assembly = (await assemblyManager.waitForAssembly(assemblyName)) as
+      | Assembly
+      | undefined
     if (!assembly) {
       throw new Error(`Assembly not found: "${assemblyName}"`)
     }
@@ -303,17 +314,63 @@ export class LocalDriver extends BackendDriver {
     return checkResults
   }
 
-  async getChanges(assemblyName: string): Promise<ChangeDocument[]> {
+  async getChanges(
+    assemblyName: string,
+    opts: GetChangesOpts = {},
+  ): Promise<GetChangesResult> {
     const regions = await this.getRegions(assemblyName)
     const refNames = regions.map((r) => r.refName)
     const db = await openDb(assemblyName, refNames)
-    const changes: ChangeDocument[] = []
+    let changes: ChangeDocument[] = []
     for await (const cursor of db.transaction('changes').store.iterate()) {
       changes.push({
         sequence: cursor.key,
         ...(cursor.value as SerializedChange & { createdAt: string }),
       })
     }
-    return changes
+
+    const { filters } = opts
+    if (filters?.user) {
+      const re = new RegExp(filters.user, 'i')
+      changes = changes.filter((c) => c.user !== undefined && re.test(c.user))
+    }
+    if (filters?.typeName) {
+      changes = changes.filter((c) => c.typeName === filters.typeName)
+    }
+    if (filters?.startTime) {
+      const start = new Date(filters.startTime).getTime()
+      changes = changes.filter((c) => new Date(c.createdAt).getTime() >= start)
+    }
+    if (filters?.endTime) {
+      const end = new Date(filters.endTime).getTime()
+      changes = changes.filter((c) => new Date(c.createdAt).getTime() <= end)
+    }
+
+    const totalCount = changes.length
+
+    const sortField = opts.sortField ?? 'sequence'
+    const sortOrder = opts.sortOrder ?? 'desc'
+    const direction = sortOrder === 'asc' ? 1 : -1
+    changes.sort((a, b) => {
+      const aVal = a[sortField as keyof ChangeDocument]
+      const bVal = b[sortField as keyof ChangeDocument]
+      if (aVal === bVal) {
+        return 0
+      }
+      if (aVal === undefined) {
+        return 1
+      }
+      if (bVal === undefined) {
+        return -1
+      }
+      return aVal < bVal ? -direction : direction
+    })
+
+    if (opts.page !== undefined && opts.pageSize !== undefined) {
+      const start = opts.page * opts.pageSize
+      changes = changes.slice(start, start + opts.pageSize)
+    }
+
+    return { changes, totalCount }
   }
 }

@@ -1,5 +1,4 @@
 import type { AnnotationFeature } from '@apollo-annotation/mst'
-import type { BaseDisplayModel } from '@jbrowse/core/pluggableElementTypes'
 import type { MenuItem } from '@jbrowse/core/ui'
 import {
   type AbstractSessionModel,
@@ -19,8 +18,8 @@ import {
 import type { LinearApolloDisplay } from '../stateModel'
 
 import { boxGlyph } from './BoxGlyph'
-import type { Glyph } from './Glyph'
-import { drawHighlight, getFeatureBox, strokeRectInner } from './util'
+import type { Glyph, OverlayType } from './Glyph'
+import { drawOverlayBox, getFeatureBox, strokeRectInner } from './util'
 
 function draw(
   display: LinearApolloDisplay,
@@ -56,23 +55,33 @@ function draw(
   }
   strokeRectInner(ctx, left, top, width, height, theme.palette.text.primary)
   if (isSelectedFeature(exon, selectedFeature)) {
-    drawHighlight(display, ctx, left, top, width, height, true)
+    drawOverlay(display, ctx, exon, row, block, 'select')
   }
 }
 
-function drawHover(
+function drawOverlay(
   display: LinearApolloDisplay,
   overlayCtx: CanvasRenderingContext2D,
   exon: AnnotationFeature,
   row: number,
   block: ContentBlock,
+  overlayType: OverlayType,
 ) {
   const { apolloRowHeight } = display
   const [, left, width] = getFeatureBox(display, exon, row, block)
   const height = Math.round(0.6 * apolloRowHeight)
   const halfHeight = Math.round(height / 2)
   const top = Math.round(halfHeight / 2) + row * apolloRowHeight
-  drawHighlight(display, overlayCtx, left, top, width, height)
+  drawOverlayBox(
+    display,
+    overlayCtx,
+    left,
+    top,
+    width,
+    height,
+    exon,
+    overlayType,
+  )
 }
 
 function getLayout(display: LinearApolloDisplay, feature: AnnotationFeature) {
@@ -96,14 +105,12 @@ function getContextMenuItems(
     session,
   } = display
   const [region] = regions
-  const currentAssemblyId = display.getAssemblyId(region.assemblyName)
+  const currentAssemblyId = display.getAssemblyId(region.assemblyName) as string
   const role = internetAccount ? internetAccount.role : 'admin'
   const admin = role === 'admin'
   const menuItems: MenuItem[] = []
   const adjacentExons = getAdjacentExons(feature, display)
-  const lgv = getContainingView(
-    display as BaseDisplayModel,
-  ) as unknown as LinearGenomeViewModel
+  const lgv = getContainingView(display) as unknown as LinearGenomeViewModel
   if (adjacentExons.upstream) {
     const exon = adjacentExons.upstream
     menuItems.push({
@@ -195,7 +202,7 @@ const { drawDragPreview } = boxGlyph
 export const exonGlyph: Glyph = {
   draw,
   drawDragPreview,
-  drawHover,
+  drawOverlay,
   getContextMenuItems,
   getLayout,
   isDraggable: true,

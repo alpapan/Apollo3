@@ -15,6 +15,7 @@ import SkipPreviousRoundedIcon from '@mui/icons-material/SkipPreviousRounded'
 import type { LinearApolloDisplayMouseEvents } from '../LinearApolloDisplay/stateModel/mouseEvents'
 import type { LinearApolloSixFrameDisplayMouseEvents } from '../LinearApolloSixFrameDisplay/stateModel/mouseEvents'
 import { AddChildFeature } from '../components/AddChildFeature'
+import { ColorFeature } from '../components/ColorFeature'
 import { CopyFeature } from '../components/CopyFeature'
 import { DeleteFeature } from '../components/DeleteFeature'
 import type { ApolloSessionModel } from '../session'
@@ -274,7 +275,7 @@ export function isSelectedFeature(
   feature: AnnotationFeature,
   selectedFeature: AnnotationFeature | undefined,
 ) {
-  return Boolean(selectedFeature && feature._id === selectedFeature._id)
+  return feature._id === selectedFeature?._id
 }
 
 function makeFeatureLabel(feature: AnnotationFeature) {
@@ -313,8 +314,8 @@ export function getContextMenuItemsForFeature(
   const role = internetAccount ? internetAccount.role : 'admin'
   const readOnly = !(role && ['admin', 'user'].includes(role))
   const [region] = regions
-  const sourceAssemblyId = display.getAssemblyId(region.assemblyName)
-  const currentAssemblyId = display.getAssemblyId(region.assemblyName)
+  const sourceAssemblyId = display.getAssemblyId(region.assemblyName) as string
+  const currentAssemblyId = display.getAssemblyId(region.assemblyName) as string
   menuItems.push(
     {
       label: makeFeatureLabel(sourceFeature),
@@ -380,6 +381,26 @@ export function getContextMenuItemsForFeature(
               setSelectedFeature: (feature?: AnnotationFeature) => {
                 display.setSelectedFeature(feature)
               },
+            },
+          ],
+        )
+      },
+    },
+    {
+      label: 'Color feature',
+      disabled: readOnly,
+      onClick: () => {
+        ;(session as unknown as AbstractSessionModel).queueDialog(
+          (doneCallback) => [
+            ColorFeature,
+            {
+              session,
+              handleClose: () => {
+                doneCallback()
+              },
+              changeManager,
+              sourceFeature,
+              sourceAssemblyId: currentAssemblyId,
             },
           ],
         )

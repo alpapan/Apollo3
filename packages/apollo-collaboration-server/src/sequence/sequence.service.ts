@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-base-to-string */
-
 import {
   File,
   type FileDocument,
@@ -9,7 +7,7 @@ import {
   type RefSeqDocument,
 } from '@apollo-annotation/schemas'
 import { BgzipIndexedFasta, IndexedFasta } from '@gmod/indexedfasta'
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { type GenericFilehandle, RemoteFile } from 'generic-filehandle2'
 import { Model } from 'mongoose'
@@ -51,21 +49,18 @@ export class SequenceService {
     private readonly refSeqChunkModel: Model<RefSeqChunkDocument>,
     @InjectModel(RefSeq.name)
     private readonly refSeqModel: Model<RefSeqDocument>,
-    private readonly assembliesService: AssembliesService,
+    @Inject(forwardRef(() => AssembliesService))
+    private readonly assembliesService: Readonly<AssembliesService>,
   ) {}
 
-  private readonly logger = new Logger(SequenceService.name)
-
   async getSequence({ end, refSeq: refSeqId, start }: GetSequenceDto) {
-    let refSeq: RefSeqDocument | null | undefined = refSeqDocLRU.get(
-      String(refSeqId),
-    )
+    let refSeq: RefSeqDocument | null | undefined = refSeqDocLRU.get(refSeqId)
     if (!refSeq) {
       refSeq = await this.refSeqModel.findById(refSeqId)
       if (!refSeq) {
         throw new Error(`RefSeq "${refSeqId}" not found`)
       }
-      refSeqDocLRU.set(String(refSeqId), refSeq)
+      refSeqDocLRU.set(refSeqId, refSeq)
     }
 
     const { assembly, chunkSize, name } = refSeq
@@ -112,7 +107,7 @@ export class SequenceService {
 
     if (assemblyDoc.fileIds?.fai) {
       const { fa: faId, fai: faiId, gzi: gziId } = assemblyDoc.fileIds
-      const adapterCacheEntry = adapterLRU.get(String(faId))
+      const adapterCacheEntry = adapterLRU.get(faId)
       let sequenceAdapter = adapterCacheEntry?.adapter
       if (!sequenceAdapter) {
         const faDoc = await this.fileModel.findById(faId)
@@ -140,7 +135,7 @@ export class SequenceService {
         if (gzi) {
           fileHandles.push(gzi)
         }
-        adapterLRU.set(String(faId), { adapter: sequenceAdapter, fileHandles })
+        adapterLRU.set(faId, { adapter: sequenceAdapter, fileHandles })
       }
       const sequence = await sequenceAdapter.getSequence(name, start, end)
       if (sequence === undefined) {
@@ -154,7 +149,7 @@ export class SequenceService {
     const seq: string[] = []
     for await (const refSeqChunk of this.refSeqChunkModel
       .find({
-        refSeq,
+        refSeq: refSeq._id,
         $and: [{ n: { $gte: startChunk } }, { n: { $lte: endChunk } }],
       })
       .sort({ n: 1 })) {

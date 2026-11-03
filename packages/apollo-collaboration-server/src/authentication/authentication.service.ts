@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import fs from 'node:fs/promises'
 
 import type { JWTPayload } from '@apollo-annotation/shared'
@@ -11,9 +10,10 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
-import type { Request } from 'express'
+import type { Request, Response } from 'express'
 import type { Profile as GoogleProfile } from 'passport-google-oauth20'
 
+import { PluginsService } from '../plugins/plugins.service.js'
 import { CreateUserDto } from '../users/dto/create-user.dto.js'
 import { UsersService } from '../users/users.service.js'
 import {
@@ -35,6 +35,7 @@ interface ConfigValues {
   GOOGLE_CLIENT_ID_FILE?: string
   ALLOW_GUEST_USER: boolean
   DEFAULT_NEW_USER_ROLE: Role
+  ALLOW_ROOT_USER: boolean
   ROOT_USER_PASSWORD: string
   CURATORIUM_EXCHANGE_SECRET: string
 }
@@ -47,6 +48,17 @@ const ALLOWED_EXCHANGE_ROLES: ReadonlySet<Role> = new Set([
 const REPLAY_TTL_MS = 120_000
 const REPLAY_CAPACITY = 1000
 const CLOCK_TOLERANCE_SECONDS = 5
+const PURGE_PURPOSE = 'purge'
+// The Apollo email of a Curatorium account: its ORCID iD at this domain.
+const CURATORIUM_USER_EMAIL =
+  /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]@apollo\.curatorium\.local$/
+
+interface PurgeJwtPayload {
+  purpose?: unknown
+  email?: unknown
+  jti?: unknown
+  exp?: unknown
+}
 
 interface InnerJwtPayload {
   username: string
@@ -61,6 +73,24 @@ interface InnerJwtPayload {
 
 const ROOT_USER_NAME = 'root'
 
+export interface AuthHandlerRedirect {
+  url: string
+}
+
+export interface AuthHandlerUser {
+  name: string
+  email: string
+}
+
+export interface CustomAuthHandler {
+  message: string
+  needsPopup: boolean
+  handler: (
+    request: Request,
+    redirectUri?: string,
+  ) => Promise<AuthHandlerRedirect | AuthHandlerUser>
+}
+
 @Injectable()
 export class AuthenticationService {
   private readonly logger = new Logger(AuthenticationService.name)
@@ -70,6 +100,7 @@ export class AuthenticationService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService<ConfigValues, true>,
+    private readonly pluginsService: PluginsService,
   ) {
     this.defaultNewUserRole = configService.get('DEFAULT_NEW_USER_ROLE', {
       infer: true,
@@ -91,7 +122,16 @@ export class AuthenticationService {
   }
 
   async getLoginTypes() {
-    const loginTypes: string[] = []
+    const defaultAuthTypes = new Map<string, CustomAuthHandler>()
+    const customAuthTypes = this.pluginsService.evaluateExtensionPoint(
+      'Apollo-RegisterCustomAuth',
+      defaultAuthTypes,
+    )
+    const loginTypes: { name: string; needsPopup: boolean; message: string }[] =
+      []
+    for (const [name, { needsPopup, message }] of customAuthTypes) {
+      loginTypes.push({ name, message, needsPopup })
+    }
     let microsoftClientID = this.configService.get('MICROSOFT_CLIENT_ID', {
       infer: true,
     })
@@ -101,7 +141,7 @@ export class AuthenticationService {
       })
       microsoftClientID =
         clientIDFile && (await fs.readFile(clientIDFile, 'utf8'))
-      microsoftClientID = clientIDFile?.trim()
+      microsoftClientID = microsoftClientID?.trim()
     }
     let googleClientID = this.configService.get('GOOGLE_CLIENT_ID', {
       infer: true,
@@ -111,19 +151,31 @@ export class AuthenticationService {
         infer: true,
       })
       googleClientID = clientIDFile && (await fs.readFile(clientIDFile, 'utf8'))
-      googleClientID = clientIDFile?.trim()
+      googleClientID = googleClientID?.trim()
     }
     const allowGuestUser = this.configService.get('ALLOW_GUEST_USER', {
       infer: true,
     })
     if (microsoftClientID) {
-      loginTypes.push('microsoft')
+      loginTypes.push({
+        name: 'microsoft',
+        message: 'Sign in with Microsoft',
+        needsPopup: true,
+      })
     }
     if (googleClientID) {
-      loginTypes.push('google')
+      loginTypes.push({
+        name: 'google',
+        message: 'Sign in with Google',
+        needsPopup: true,
+      })
     }
     if (allowGuestUser) {
-      loginTypes.push('guest')
+      loginTypes.push({
+        name: 'guest',
+        message: 'Continue as Guest',
+        needsPopup: false,
+      })
     }
     return loginTypes
   }
@@ -169,8 +221,61 @@ export class AuthenticationService {
     throw new UnauthorizedException('Guest users are not allowed')
   }
 
+  async fallbackLogin(
+    id: string,
+    request: Request,
+    response: Response,
+    redirectUri?: string,
+    state?: string,
+  ) {
+    const defaultAuthTypes = new Map<string, CustomAuthHandler>()
+    const customAuthTypes = this.pluginsService.evaluateExtensionPoint(
+      'Apollo-RegisterCustomAuth',
+      defaultAuthTypes,
+    )
+    const customAuth = customAuthTypes.get(id)
+    if (!customAuth) {
+      throw new UnauthorizedException('Unknown authentication type')
+    }
+    let result: AuthHandlerRedirect | AuthHandlerUser
+    try {
+      result = await customAuth.handler(request, redirectUri)
+    } catch (error) {
+      throw new UnauthorizedException(error)
+    }
+    if ('url' in result) {
+      response.redirect(result.url)
+      return result
+    }
+    if ('name' in result && 'email' in result) {
+      const logInResult = await this.logIn(result.name, result.email)
+      if (customAuth.needsPopup && state) {
+        const { redirect_uri } = JSON.parse(state) as { redirect_uri: string }
+        const url = new URL(redirect_uri)
+        const searchParams = new URLSearchParams({
+          access_token: logInResult.token,
+        })
+        url.search = searchParams.toString()
+        response.redirect(url.toString())
+      }
+      return logInResult
+    }
+    throw new UnauthorizedException('Malformed authentication handler response')
+  }
+
   async rootLogin(password: string) {
-    if (password === this.configService.get('ROOT_USER_PASSWORD')) {
+    const allowRootUser = this.configService.get('ALLOW_ROOT_USER', {
+      infer: true,
+    })
+    const rootPassword = this.configService.get('ROOT_USER_PASSWORD', {
+      infer: true,
+    })
+    if (
+      allowRootUser &&
+      typeof rootPassword === 'string' &&
+      rootPassword !== '' &&
+      password === rootPassword
+    ) {
       return this.logIn(ROOT_USER_NAME, ROOT_USER_EMAIL)
     }
     throw new UnauthorizedException('Invalid password for ROOT user')
@@ -186,7 +291,7 @@ export class AuthenticationService {
     // Find user from Mongo
     let user = await this.usersService.findByEmail(email)
     if (!user) {
-      let newUserRole = this.defaultNewUserRole
+      let newUserRole
       const isRootUser = name === ROOT_USER_NAME && email === ROOT_USER_EMAIL
       if (isRootUser) {
         newUserRole = Role.Admin
@@ -194,6 +299,7 @@ export class AuthenticationService {
         const users = await this.usersService.findAll()
         const hasAdmin = users.some(
           (user) =>
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
             user.role === Role.Admin &&
             user.email !== 'root_user' &&
             user.email !== 'guest_user',
@@ -217,7 +323,7 @@ export class AuthenticationService {
       username: user.username,
       email: user.email,
       role: user.role as Role,
-      id: user.id as string,
+      id: user.id,
     })
   }
 
@@ -242,10 +348,10 @@ export class AuthenticationService {
 
   /**
    * Exchange a curatorium-backend-signed HS256 JWT for an Apollo-minted
-   * HS256 JWT. The inner JWT carries ORCID, role, and id1 tracking claims;
-   * we honour the role verbatim (no first-user-becomes-admin fallback -
-   * the role is set by curatorium-backend's CURATORIUM_APOLLO_ADMIN_ORCIDS
-   * allowlist).
+   * HS256 JWT. The inner JWT carries ORCID, role, and id1 tracking claims.
+   * There is no first-user-becomes-admin fallback: the role is derived by
+   * curatorium-backend from the person's Curatorium roles and is applied to
+   * the stored user on every exchange, up or down.
    */
   async exchangeCuratoriumToken(innerJwt: string) {
     const secret = this.configService.get('CURATORIUM_EXCHANGE_SECRET', {
@@ -262,44 +368,27 @@ export class AuthenticationService {
       throw new UnauthorizedException('Invalid exchange token')
     }
 
-    // Replay defence: TTL purge, then size-cap (FIFO), then check + record.
-    // Relies on `Map` insertion-order iteration (ES6 guarantee) for FIFO:
-    // oldest entry first, so we can break on the first non-expired entry.
-    const now = Date.now()
-    for (const [jti, storedAt] of this.seenJtis) {
-      if (now - storedAt <= REPLAY_TTL_MS) {
-        break
-      }
-      this.seenJtis.delete(jti)
-    }
-    if (this.seenJtis.has(payload.jti)) {
-      throw new UnauthorizedException('Token replay')
-    }
-    while (this.seenJtis.size >= REPLAY_CAPACITY) {
-      // Narrow Map.keys().next().value (typed as `any` under tseslint's
-      // strict-type-checked) to string | undefined so the delete below
-      // doesn't trip `no-unsafe-argument`.
-      const oldest: string | undefined = this.seenJtis.keys().next().value
-      if (oldest === undefined) {
-        break
-      }
-      this.seenJtis.delete(oldest)
-    }
-    this.seenJtis.set(payload.jti, now)
-
+    // Rejected before the replay record is touched: a token that can never be
+    // accepted must not take a slot there, or enough of them would push
+    // accepted tokens out of the record and let those be replayed.
     if (!ALLOWED_EXCHANGE_ROLES.has(payload.role as Role)) {
       throw new UnauthorizedException(`Unknown role: ${payload.role}`)
     }
     const role = payload.role as Role
 
+    this.recordJti(payload.jti)
+
     let user = await this.usersService.findByEmail(payload.email)
     if (user) {
+      // The role sent is applied on every exchange, up or down, so Apollo's
+      // stored role follows curatorium-backend's derivation at each sign-in.
       const shouldResync =
+        (user.role as Role) !== role ||
         user.lastId1Kid !== payload.id1_kid ||
         user.lastId1BootId !== payload.id1_boot_id
       if (shouldResync) {
         const updated = await this.usersService.updateRoleAndTracking(
-          user.id as string,
+          user.id,
           role,
           payload.id1_kid,
           payload.id1_boot_id,
@@ -330,7 +419,7 @@ export class AuthenticationService {
         }
       }
       await this.usersService.updateRoleAndTracking(
-        user.id as string,
+        user.id,
         role,
         payload.id1_kid,
         payload.id1_boot_id,
@@ -347,9 +436,86 @@ export class AuthenticationService {
         username: user.username,
         email: user.email,
         role: user.role as Role,
-        id: user.id as string,
+        id: user.id,
       },
       { expSeconds },
     )
+  }
+
+  /**
+   * Delete the Apollo user of a purged Curatorium account. The token is an
+   * HS256 JWT signed by curatorium-backend with CURATORIUM_EXCHANGE_SECRET,
+   * carrying purpose 'purge', the user's Apollo email, a fresh jti and an exp.
+   * Only an email of the form <orcid>\@apollo.curatorium.local is accepted, so
+   * the root, guest and any non-Curatorium user can never be named. Answers
+   * 'absent' for a user that is not stored, so a repeated purge succeeds.
+   */
+  async purgeCuratoriumUser(purgeJwt: string) {
+    const secret = this.configService.get('CURATORIUM_EXCHANGE_SECRET', {
+      infer: true,
+    })
+    let payload: PurgeJwtPayload
+    try {
+      payload = this.jwtService.verify<PurgeJwtPayload>(purgeJwt, {
+        secret,
+        algorithms: ['HS256'],
+        clockTolerance: CLOCK_TOLERANCE_SECONDS,
+      })
+    } catch {
+      throw new UnauthorizedException('Invalid purge token')
+    }
+
+    // Rejected before the replay record is touched, as in the exchange.
+    if (
+      payload.purpose !== PURGE_PURPOSE ||
+      typeof payload.jti !== 'string' ||
+      payload.jti === '' ||
+      typeof payload.exp !== 'number'
+    ) {
+      throw new UnauthorizedException('Invalid purge token')
+    }
+    if (
+      typeof payload.email !== 'string' ||
+      !CURATORIUM_USER_EMAIL.test(payload.email)
+    ) {
+      throw new UnauthorizedException('Purge refused for this email')
+    }
+
+    this.recordJti(payload.jti)
+
+    const deleted = await this.usersService.deleteByEmail(payload.email)
+    const status = deleted === null ? 'absent' : 'deleted'
+    this.logger.log(`Purge of "${payload.email}": ${status}`)
+    return { status }
+  }
+
+  /**
+   * Replay defence shared by the exchange and the purge: TTL purge, then
+   * size-cap (FIFO), then check + record. Relies on `Map` insertion-order
+   * iteration (ES6 guarantee) for FIFO: oldest entry first, so we can break on
+   * the first non-expired entry.
+   */
+  private recordJti(jti: string) {
+    const now = Date.now()
+    for (const [seenJti, storedAt] of this.seenJtis) {
+      if (now - storedAt <= REPLAY_TTL_MS) {
+        break
+      }
+      this.seenJtis.delete(seenJti)
+    }
+    if (this.seenJtis.has(jti)) {
+      throw new UnauthorizedException('Token replay')
+    }
+    while (this.seenJtis.size >= REPLAY_CAPACITY) {
+      // Narrow Map.keys().next().value (typed as `any` under tseslint's
+      // strict-type-checked) to string | undefined so the delete below
+      // doesn't trip `no-unsafe-argument`.
+      const oldest: string | undefined = this.seenJtis.keys().next().value
+      if (oldest === undefined) {
+        break
+      }
+      this.seenJtis.delete(oldest)
+    }
+    this.seenJtis.set(jti, now)
   }
 }

@@ -1,7 +1,8 @@
+import os from 'node:os'
 import { it } from 'node:test'
 
 import type { CheckResultSnapshot } from '@apollo-annotation/mst'
-import spawn from 'cross-spawn'
+import crossSpawn from 'cross-spawn'
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
@@ -26,10 +27,22 @@ export class Shell {
   constructor(cmd: string, strict = true, timeout?: number) {
     process.stdout.write(`${cmd}\n`)
     cmd = `set -e; set -u; set -o pipefail\n${cmd}`
-    const p = spawn.sync(cmd, { shell: '/bin/bash', timeout })
+    const p = crossSpawn.sync(cmd, { shell: '/bin/bash', timeout })
     this.returncode = p.status
-    this.stdout = p.stdout.toString()
-    this.stderr = p.stderr.toString()
+    this.stdout = p.stdout
+      .toString()
+      .split(os.EOL)
+      .join(' ')
+      .replaceAll('›', '')
+      .replaceAll(/ {2,}/g, ' ')
+      .trim()
+    this.stderr = p.stderr
+      .toString()
+      .split(os.EOL)
+      .join(' ')
+      .replaceAll('›', '')
+      .replaceAll(/ {2,}/g, ' ')
+      .trim()
     if (strict && this.returncode != 0) {
       throw new Error(
         `${p.error}\nCOMMAND:\n${cmd}\nSTDOUT:\n${this.stdout}\nSTDERR:\n${this.stderr}\nEXIT CODE: ${this.returncode}`,

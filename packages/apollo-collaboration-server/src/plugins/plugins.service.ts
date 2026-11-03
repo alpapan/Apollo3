@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import { ApolloPlugin } from '@apollo-annotation/common'
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { APOLLO_PLUGINS } from './plugins.constants.js'
 
 @Injectable()
 export class PluginsService {
+  private readonly logger = new Logger(PluginsService.name)
+
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   extensionPoints = new Map<string, Function[]>()
 
@@ -29,20 +31,25 @@ export class PluginsService {
     callbacks.push(callback)
   }
 
-  evaluateExtensionPoint(
+  evaluateExtensionPoint<T>(
     extensionPointName: string,
-    extendee: unknown,
+    extendee: T,
     props?: Record<string, unknown>,
   ) {
     const callbacks = this.extensionPoints.get(extensionPointName)
     let accumulator = extendee
-    if (callbacks) {
-      for (const callback of callbacks) {
-        try {
-          accumulator = callback(accumulator, props)
-        } catch (error) {
-          console.error(error)
-        }
+    if (!callbacks) {
+      return accumulator
+    }
+    for (const callback of callbacks) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        accumulator = callback(accumulator, props)
+      } catch (error) {
+        this.logger.error(
+          `Plugin callback for extension point "${extensionPointName}" failed`,
+          error instanceof Error ? error.stack : String(error),
+        )
       }
     }
     return accumulator
