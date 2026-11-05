@@ -2,7 +2,7 @@
 
 > **Load the `curatorium-apollo` skill before working in this submodule (HARD
 > RULE).** Carries the build/test/lint sequence, corepack+Yarn-PnP failure mode,
-> Node 24.14 rationale, and Curatorium auth grafts. Subagents don't inherit it -
+> Node 24.22 rationale, and Curatorium auth grafts. Subagents don't inherit it -
 > name it.
 
 ## What this is
