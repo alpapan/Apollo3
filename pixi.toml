@@ -5,16 +5,20 @@ description = "Apollo3 collaboration server (Curatorium fork) - pixi tasks for l
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 
-# Node is pinned to 24.14 as a conda dependency below so the apollo toolchain is
-# deterministic. Node 24.15+ changed CJS-loaded-via-ESM-translator behaviour, which
-# breaks ESLint's config-loader (require.cache) and jest-resolve (require.resolve.paths)
-# under Yarn PnP + ESM. Tasks invoke Berry directly via `node .yarn/releases/yarn-4.18.0.cjs`
-# (NOT via corepack) - corepack's runVersion() calls require.resolve('corepack/package.json')
-# to set COREPACK_ROOT, which Yarn PnP intercepts and rejects for nested yarn workspace
-# calls inside scripts. The yarnPath below must match .yarnrc.yml's yarnPath field.
+# Node is pinned to the 24.22 line as a conda dependency below so the apollo toolchain is
+# deterministic. Node 24.15 changed CJS-loaded-via-ESM-translator behaviour, which broke
+# ESLint's config-loader (require.cache) and jest-resolve (require.resolve.paths)
+# under Yarn PnP + ESM. The 24.22 line replaces 24.14 once the gate below passes: a clean
+# install, an ESLint run and a jest run, and the image build, all on the new line.
+# The pin resolves the 24.22 line's own patch (24.22.1 on conda-forge), and the gate
+# is what validates it. Tasks invoke Berry directly via
+# `node .yarn/releases/yarn-4.18.0.cjs` (NOT via corepack) - corepack's runVersion() calls
+# require.resolve('corepack/package.json') to set COREPACK_ROOT, which Yarn PnP intercepts and
+# rejects for nested yarn workspace calls inside scripts. The yarnPath below must match
+# .yarnrc.yml's yarnPath field.
 [dependencies]
 python = "3.14.*"
-nodejs = ">=24.14,<24.15"
+nodejs = ">=24.22,<24.23"
 
 [tasks]
 # `pixi run -m apps/apollo/pixi.toml lint`
