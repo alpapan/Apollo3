@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-> **⛔ Load the `curatorium-apollo` skill before working in this submodule (HARD
+> **Load the `curatorium-apollo` skill before working in this submodule (HARD
 > RULE).** Carries the build/test/lint sequence, corepack+Yarn-PnP failure mode,
-> Node 24.14 rationale, and Curatorium auth grafts. Subagents don't inherit it -
+> Node 24.22 rationale, and Curatorium auth grafts. Subagents don't inherit it -
 > name it.
 
 ## What this is
@@ -18,13 +18,13 @@ deployment stay backend-owned**
 
 ```bash
 cd ~/software/curatorium
-ENV=test pixi run curatorium admin build apollo --rebuild --drop
+ENV=test pixi run curatorium k3s build apollo --rebuild --drop
 ```
 
 Never `docker build` or `kubectl apply` directly.
 
 ## Commit submodule changes from here
 
-`cd apps/apollo && git add <file> && git commit -m "feat(apollo): …"` on the
+`cd apps/apollo && git add <file> && git commit -m "feat(apollo): ..."` on the
 `curatorium` branch. The monorepo pins a specific commit; bumping it needs a
 separate commit at the Curatorium monorepo root.

@@ -6,12 +6,12 @@ import type { MenuItem } from '@jbrowse/core/ui'
 import { getFrame } from '@jbrowse/core/util'
 import type { ContentBlock } from '@jbrowse/core/util/blockTypes'
 
-import { isSelectedFeature } from '../../util'
+import { isSelectedFeature, isTranscriptFeature } from '../../util'
 import type { LinearApolloDisplay } from '../stateModel'
 
 import { boxGlyph } from './BoxGlyph'
-import type { Glyph } from './Glyph'
-import { drawHighlight, getFeatureBox, strokeRectInner } from './util'
+import type { Glyph, OverlayType } from './Glyph'
+import { drawOverlayBox, getFeatureBox, strokeRectInner } from './util'
 
 function drawCDSLocation(
   display: LinearApolloDisplay,
@@ -72,6 +72,12 @@ function draw(
     boxGlyph.draw(display, ctx, cds, row, 0, block)
     return
   }
+  // The feature type ontology loads asynchronously. Until it has, the parent
+  // is not recognised as a transcript and reading cdsLocations would throw.
+  // This read is tracked, so the draw reruns once the ontology has loaded.
+  if (!isTranscriptFeature(transcript, display.session)) {
+    return
+  }
   const { cdsLocations } = transcript
   const thisCDSLocations = cdsLocations.find((loc) => {
     const min = loc.at(cds.strand === 1 ? 0 : -1)?.min
@@ -84,25 +90,33 @@ function draw(
   for (const cdsLocation of thisCDSLocations) {
     drawCDSLocation(display, ctx, cdsLocation, cds.strand, row, block)
   }
-  const { apolloRowHeight, selectedFeature } = display
+  const { selectedFeature } = display
   if (isSelectedFeature(cds, selectedFeature)) {
-    const [top, left, width] = getFeatureBox(display, cds, row, block)
-    const height = getRowCount() * apolloRowHeight
-    drawHighlight(display, ctx, left, top, width, height, true)
+    drawOverlay(display, ctx, cds, row, block, 'select')
   }
 }
 
-function drawHover(
+function drawOverlay(
   display: LinearApolloDisplay,
   overlayCtx: CanvasRenderingContext2D,
   cds: AnnotationFeature,
   row: number,
   block: ContentBlock,
+  overlayType: OverlayType,
 ) {
   const { apolloRowHeight } = display
   const [top, left, width] = getFeatureBox(display, cds, row, block)
   const height = getRowCount() * apolloRowHeight
-  drawHighlight(display, overlayCtx, left, top, width, height)
+  drawOverlayBox(
+    display,
+    overlayCtx,
+    left,
+    top,
+    width,
+    height,
+    cds,
+    overlayType,
+  )
 }
 
 function getLayout(display: LinearApolloDisplay, feature: AnnotationFeature) {
@@ -130,7 +144,7 @@ const { drawDragPreview } = boxGlyph
 export const cdsGlyph: Glyph = {
   draw,
   drawDragPreview,
-  drawHover,
+  drawOverlay,
   getContextMenuItems,
   getLayout,
   isDraggable: true,

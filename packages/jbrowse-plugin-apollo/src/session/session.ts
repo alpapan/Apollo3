@@ -18,9 +18,11 @@ import {
   readConfObject,
 } from '@jbrowse/core/configuration'
 import type { BaseTrackConfig } from '@jbrowse/core/pluggableElementTypes'
-import type {
-  AbstractSessionModel,
-  SessionWithAddTracks,
+import {
+  type AbstractSessionModel,
+  type SessionWithAddTracks,
+  type SessionWithDrawerWidgets,
+  isElectron,
 } from '@jbrowse/core/util'
 import {
   type Instance,
@@ -45,6 +47,7 @@ import {
   type ClientDataStoreModel,
   clientDataStoreFactory,
 } from './ClientDataStore'
+import { handleApolloFeaturesUrlParam } from './handleApolloFeaturesUrlParam'
 
 export interface ApolloSession extends AbstractSessionModel {
   apolloDataStore: ClientDataStoreModel
@@ -169,10 +172,7 @@ export function extendSession(
             for (const block of dynamicBlocks.contentBlocks) {
               const { assemblyName, end, refName, start } = block
               const assembly = self.apolloDataStore.assemblies.get(assemblyName)
-              if (
-                assembly &&
-                assembly.backendDriverType === 'CollaborationServerDriver'
-              ) {
+              if (assembly?.backendDriverType === 'CollaborationServerDriver') {
                 locations.push({ assemblyName, refName, start, end })
               }
             }
@@ -245,8 +245,8 @@ export function extendSession(
                     const assembly =
                       self.apolloDataStore.assemblies.get(assemblyName)
                     if (
-                      assembly &&
-                      assembly.backendDriverType === 'CollaborationServerDriver'
+                      assembly?.backendDriverType ===
+                      'CollaborationServerDriver'
                     ) {
                       locations.push({ assemblyName, refName, start, end })
                     }
@@ -409,25 +409,64 @@ export function extendSession(
         )
       },
     }))
+    .actions((self) => ({
+      async afterCreate() {
+        if (isElectron) {
+          return
+        }
+        const url = new URL(globalThis.location.href)
+        const apolloFeatures = url.searchParams.get('apolloFeatures')
+        if (!apolloFeatures) {
+          return
+        }
+        const { assemblyManager } = self as unknown as AbstractSessionModel
+        await handleApolloFeaturesUrlParam(
+          apolloFeatures,
+          self.apolloDataStore,
+          assemblyManager,
+          self as unknown as AbstractSessionModel,
+        )
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+        const updatedURL = new URL(globalThis.location.href)
+        updatedURL.searchParams.delete('apolloFeatures')
+        globalThis.history.replaceState(null, '', updatedURL.toString())
+      },
+      afterAttach() {
+        addDisposer(
+          self,
+          autorun((reaction) => {
+            const { focusedViewId, activeWidgets } =
+              self as unknown as SessionWithDrawerWidgets
+            if (!(focusedViewId && activeWidgets)) {
+              return
+            }
+            const trackSelector = activeWidgets.get('hierarchicalTrackSelector')
+            // @ts-expect-error Don't have type for track selector
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            trackSelector?.setView(focusedViewId)
+            reaction.dispose()
+          }),
+        )
+      },
+    }))
 
     .views((self) => {
-      const superTrackActionMenuItems = (
-        self as unknown as AbstractSessionModel
-      ).getTrackActionMenuItems
+      const superTrackActions = (self as unknown as AbstractSessionModel)
+        .getTrackActions
       return {
-        getTrackActionMenuItems(conf: BaseTrackConfig) {
+        getTrackActions(conf: BaseTrackConfig) {
           if (
             conf.type === 'ApolloTrack' ||
             conf.type === 'ReferenceSequenceTrack'
           ) {
-            return superTrackActionMenuItems?.(conf)
+            return superTrackActions?.(conf)
           }
           const trackId = readConfObject(conf, 'trackId') as string
           const sessionTrackIdentifier = '-sessionTrack'
           const isSessionTrack = trackId.endsWith(sessionTrackIdentifier)
           return isSessionTrack
             ? [
-                ...(superTrackActionMenuItems?.(conf) ?? []),
+                ...(superTrackActions?.(conf) ?? []),
                 {
                   label: 'Save track to Apollo',
                   onClick: async () => {
@@ -480,7 +519,7 @@ export function extendSession(
                 },
               ]
             : [
-                ...(superTrackActionMenuItems?.(conf) ?? []),
+                ...(superTrackActions?.(conf) ?? []),
                 {
                   label: 'Remove track from Apollo',
                   onClick: async () => {

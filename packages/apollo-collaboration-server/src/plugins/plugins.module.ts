@@ -5,8 +5,6 @@ import path from 'node:path'
 import { Writable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
 import {
   ApolloPlugin,
   type ApolloPluginConstructor,
@@ -22,9 +20,12 @@ import sanitize from 'sanitize-filename'
 import { APOLLO_PLUGINS } from './plugins.constants.js'
 import { PluginsService } from './plugins.service.js'
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
 @Module({})
 export class PluginsModule {
-  private readonly logger = new Logger(PluginsModule.name)
+  // Static so it's reachable from the static fetchPlugins method
+  static readonly logger = new Logger(PluginsModule.name)
 
   static async registerAsync(): Promise<DynamicModule> {
     const { PLUGIN_URLS, PLUGIN_URLS_FILE } = process.env
@@ -74,12 +75,24 @@ export class PluginsModule {
           await response.body.pipeTo(file)
         } catch (error) {
           fs.unlinkSync(pluginLocation)
-          console.error(error)
+          PluginsModule.logger.error(
+            `Failed to download plugin from ${url}`,
+            error instanceof Error ? error.stack : String(error),
+          )
           throw error
         }
         plugin = await import(pluginLocationRelative)
       } finally {
-        await fsPromises.rm(tmpDir, { recursive: true })
+        // A cleanup failure is logged, never thrown, so it cannot replace the
+        // error from the try block (or fail an otherwise successful load).
+        try {
+          await fsPromises.rm(tmpDir, { recursive: true, force: true })
+        } catch (error) {
+          PluginsModule.logger.error(
+            `Could not remove plugin directory "${tmpDir}"`,
+            error instanceof Error ? error.stack : String(error),
+          )
+        }
       }
       if (!plugin) {
         throw new Error(`Could not load plugin: ${url}`)

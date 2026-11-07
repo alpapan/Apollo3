@@ -8,18 +8,14 @@ import type {
   DisplayType,
   PluggableElementType,
 } from '@jbrowse/core/pluggableElementTypes'
-import {
-  type AbstractSessionModel,
-  getContainingView,
-  getSession,
-} from '@jbrowse/core/util'
+import { getContainingView, getSession } from '@jbrowse/core/util'
 import type { Feature } from '@jbrowse/core/util/simpleFeature'
 import type { LinearGenomeViewModel } from '@jbrowse/plugin-linear-genome-view'
-import AddIcon from '@mui/icons-material/Add'
 import ObjectID from 'bson-objectid'
 
 import { CollaborationServerDriver } from '../BackendDrivers'
 import { CreateApolloAnnotation } from '../components/CreateApolloAnnotation'
+import { Apollo as ApolloIcon } from '../menus/Icons'
 import type { ApolloSessionModel } from '../session'
 
 function parseCigar(cigar: string): [string, number][] {
@@ -59,8 +55,24 @@ export function annotationFromPileup(pluggableElement: PluggableElementType) {
       getAnnotationFeature(jbrowseFeature: Feature, refSeqId: string) {
         const start: number = jbrowseFeature.get('start')
         const end: number = jbrowseFeature.get('end')
-        const strand = jbrowseFeature.get('strand') as 1 | -1 | undefined
         const name = jbrowseFeature.get('name') as string | undefined
+
+        let strand: 1 | -1 | undefined
+        const tags = jbrowseFeature.get('tags') as Record<
+          string,
+          string | number | undefined
+        >
+        const { ts, TS, XS } = tags
+        for (const tag of [ts, TS, XS]) {
+          if (!strand && tag) {
+            if ([1, '1', '+'].includes(tag)) {
+              strand = 1
+            } else if ([-1, '-1', '-'].includes(tag)) {
+              strand = -1
+            }
+          }
+        }
+        strand ??= jbrowseFeature.get('strand') as 1 | -1 | undefined
 
         const cigarData = jbrowseFeature.get('CIGAR') as string
         const ops = parseCigar(cigarData)
@@ -81,9 +93,7 @@ export function annotationFromPileup(pluggableElement: PluggableElementType) {
             case 'M':
             case '=':
             case 'X': {
-              if (currentExonStart === undefined) {
-                currentExonStart = position
-              }
+              currentExonStart ??= position
               position += len
               break
             }
@@ -172,7 +182,7 @@ export function annotationFromPileup(pluggableElement: PluggableElementType) {
             ...superContextMenuItems(),
             {
               label: 'Create Apollo annotation',
-              icon: AddIcon,
+              icon: ApolloIcon,
               onClick: async () => {
                 const backendDriver = (
                   session as unknown as ApolloSessionModel
@@ -190,24 +200,22 @@ export function annotationFromPileup(pluggableElement: PluggableElementType) {
                   }
                   refSeqId = backendRefSeqId
                 }
-                ;(session as unknown as AbstractSessionModel).queueDialog(
-                  (doneCallback) => [
-                    CreateApolloAnnotation,
-                    {
-                      session,
-                      handleClose: () => {
-                        doneCallback()
-                      },
-                      annotationFeature: self.getAnnotationFeature(
-                        jbrowseFeature,
-                        refSeqId,
-                      ),
-                      assembly,
-                      refSeqId,
-                      region,
+                session.queueDialog((doneCallback) => [
+                  CreateApolloAnnotation,
+                  {
+                    session,
+                    handleClose: () => {
+                      doneCallback()
                     },
-                  ],
-                )
+                    annotationFeature: self.getAnnotationFeature(
+                      jbrowseFeature,
+                      refSeqId,
+                    ),
+                    assembly,
+                    refSeqId,
+                    region,
+                  },
+                ])
               },
             },
           ]

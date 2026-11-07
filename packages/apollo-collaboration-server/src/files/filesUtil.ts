@@ -6,6 +6,7 @@ import {
   mkdtemp,
   open,
   rename,
+  rm,
   rmdir,
 } from 'node:fs/promises'
 import path from 'node:path'
@@ -35,6 +36,19 @@ export interface UploadedFile extends Express.Multer.File {
 
 export interface FileRequest extends Omit<Request, 'file'> {
   file: Partial<UploadedFile>
+}
+
+// Removes the per-upload temporary directory and anything left in it. A
+// failure here is logged, never thrown, so it cannot replace the upload error
+// that triggered the cleanup.
+async function removeUploadTmpDir(tmpDir: string, logger: Logger) {
+  try {
+    await rm(tmpDir, { recursive: true, force: true })
+  } catch (error) {
+    logger.warn(
+      `Could not remove temporary upload directory "${tmpDir}": ${String(error)}`,
+    )
+  }
 }
 
 export async function writeFileAndCalculateHash(
@@ -74,28 +88,33 @@ export async function writeFileAndCalculateHash(
     return chunk
   })
 
-  const fileWriteStream = createWriteStream(tmpFileName)
+  try {
+    const fileWriteStream = createWriteStream(tmpFileName)
 
-  if (contentEncoding === 'gzip') {
-    await pipeline(stream, fileWriteStream)
-  } else {
-    const gz = createGzip()
-    await pipeline(stream, gz, fileWriteStream)
+    if (contentEncoding === 'gzip') {
+      await pipeline(stream, fileWriteStream)
+    } else {
+      const gz = createGzip()
+      await pipeline(stream, gz, fileWriteStream)
+    }
+    const fileChecksum = hash.digest('hex')
+    logger.debug(`Uploaded file checksum: "${fileChecksum}"`)
+
+    const uploadedFileName = path.join(fileUploadFolder, fileChecksum)
+    logger.debug(
+      `File uploaded successfully, moving temporary file to final location: "${uploadedFileName}"`,
+    )
+    await rename(tmpFileName, uploadedFileName)
+    await rmdir(tmpDir)
+    logger.log('File upload finished')
+    return fileChecksum
+  } catch (error) {
+    await removeUploadTmpDir(tmpDir, logger)
+    throw error
   }
-  const fileChecksum = hash.digest('hex')
-  logger.debug(`Uploaded file checksum: "${fileChecksum}"`)
-
-  const uploadedFileName = path.join(fileUploadFolder, fileChecksum)
-  logger.debug(
-    `File uploaded successfully, moving temporary file to final location: "${uploadedFileName}"`,
-  )
-  await rename(tmpFileName, uploadedFileName)
-  await rmdir(tmpDir)
-  logger.log('File upload finished')
-  return fileChecksum
 }
 
-async function unzip(input: FileHandle): Promise<Buffer> {
+async function unzip(input: FileHandle): Promise<Buffer<ArrayBuffer>> {
   const gunzipP = promisify(gunzip)
   const fileContents = await input.readFile()
   const unzippedContents = await gunzipP(fileContents)
@@ -104,7 +123,7 @@ async function unzip(input: FileHandle): Promise<Buffer> {
 
 export class LocalFileGzip implements GenericFilehandle {
   private fileHandle: Promise<FileHandle>
-  private contents: Promise<Buffer>
+  private contents: Promise<Buffer<ArrayBuffer>>
   private filename: string
   private opts: FilehandleOptions
 
@@ -116,7 +135,10 @@ export class LocalFileGzip implements GenericFilehandle {
     this.contents = fhPromise.then((fh) => unzip(fh))
   }
 
-  public async read(length: number, position = 0): Promise<Buffer> {
+  public async read(
+    length: number,
+    position = 0,
+  ): Promise<Buffer<ArrayBuffer>> {
     const buffer = Buffer.alloc(length)
     const unzippedContents = await this.contents
     unzippedContents.copy(buffer, 0, position, position + length)
@@ -127,7 +149,7 @@ export class LocalFileGzip implements GenericFilehandle {
     options?:
       | Omit<FilehandleOptions, 'encoding'>
       | (Omit<FilehandleOptions, 'encoding'> & { encoding: undefined }),
-  ): Promise<Buffer>
+  ): Promise<Buffer<ArrayBuffer>>
   public async readFile(
     options:
       | BufferEncoding
@@ -136,7 +158,7 @@ export class LocalFileGzip implements GenericFilehandle {
 
   public async readFile(
     _options?: FilehandleOptions | BufferEncoding,
-  ): Promise<Buffer | string> {
+  ): Promise<Buffer<ArrayBuffer> | string> {
     const unzippedContents = await this.contents
     if (this.opts.encoding) {
       return unzippedContents.toString(this.opts.encoding)

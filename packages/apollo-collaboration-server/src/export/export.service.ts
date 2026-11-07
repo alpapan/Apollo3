@@ -17,17 +17,22 @@ import {
   type RefSeqDocument,
 } from '@apollo-annotation/schemas'
 import { GFFFormattingTransformer } from '@gmod/gff'
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectModel } from '@nestjs/mongoose'
-import { type FilterQuery, Model } from 'mongoose'
-import StreamConcat from 'stream-concat'
+import { Model, type QueryFilter } from 'mongoose'
+
+import { concatStreams } from '../utils/concatStreams.js'
 
 import {
   FeatureDocToGFF3FeatureStream,
   RefSeqChunkDocToFASTAStream,
   RefSeqDocToGFF3HeaderStream,
 } from './transforms.js'
+
+// Matches the 300 second TTL index on the Export schema and the lifetime the
+// export controller documents for getID.
+const EXPORT_ID_LIFETIME_MS = 5 * 60 * 1000
 
 @Injectable()
 export class ExportService {
@@ -50,8 +55,6 @@ export class ExportService {
     >,
   ) {}
 
-  private readonly logger = new Logger(ExportService.name)
-
   async getAssemblyName(assemblyId: string) {
     const assemblyDoc = await this.assemblyModel.findById(assemblyId)
     if (!assemblyDoc) {
@@ -70,6 +73,11 @@ export class ExportService {
   ): Promise<[Readable, string]> {
     const exportDoc = await this.exportModel.findById(exportID)
     if (!exportDoc) {
+      throw new NotFoundException()
+    }
+    const createdAt = exportDoc.get('createdAt') as Date
+    const ageMs = Date.now() - createdAt.getTime()
+    if (ageMs > EXPORT_ID_LIFETIME_MS) {
       throw new NotFoundException()
     }
     const { fastaWidth, includeFASTA } = opts
@@ -116,10 +124,7 @@ export class ExportService {
       }
     }
     const streams = [headerStream, featureStream, ...sequenceStreams]
-    const combinedStream: Readable = new StreamConcat(
-      streams.map((stream) => Readable.fromWeb(stream)),
-    )
-    return [combinedStream, assembly.toString()]
+    return [concatStreams(streams), assembly.toString()]
   }
 
   async streamFromLocalFasta(
@@ -166,7 +171,7 @@ export class ExportService {
   }
 
   streamFromRefSeqCollection(
-    query: FilterQuery<RefSeqDocument>,
+    query: QueryFilter<RefSeqDocument>,
     fastaWidth?: number,
   ): ReadableStream<string>[] {
     const sequenceStream = Readable.toWeb(

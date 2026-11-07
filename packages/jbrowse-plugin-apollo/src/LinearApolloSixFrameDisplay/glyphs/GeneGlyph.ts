@@ -2,7 +2,6 @@ import type {
   AnnotationFeature,
   TranscriptPartCoding,
 } from '@apollo-annotation/mst'
-import type { BaseDisplayModel } from '@jbrowse/core/pluggableElementTypes'
 import type { MenuItem } from '@jbrowse/core/ui'
 import {
   type AbstractSessionModel,
@@ -473,7 +472,7 @@ function drawDragPreview(
   overlayCtx.fillRect(rectX, rectY, rectWidth, rectHeight)
 }
 
-function drawHover(
+function drawOverlay(
   stateModel: LinearApolloSixFrameDisplay,
   ctx: CanvasRenderingContext2D,
 ) {
@@ -495,7 +494,12 @@ function drawHover(
   if (!featureTypeOntology) {
     throw new Error('featureTypeOntology is undefined')
   }
-  if (!featureTypeOntology.isTypeOf(feature.type, 'transcript')) {
+  if (
+    !(
+      featureTypeOntology.isTypeOf(feature.type, 'transcript') ||
+      featureTypeOntology.isTypeOf(feature.type, 'pseudogenic_transcript')
+    )
+  ) {
     return
   }
   const featureID: string | undefined = feature.attributes
@@ -665,7 +669,9 @@ function getDraggableFeatureInfo(
   if (!featureTypeOntology) {
     throw new Error('featureTypeOntology is undefined')
   }
-  const isTranscript = featureTypeOntology.isTypeOf(feature.type, 'transcript')
+  const isTranscript =
+    featureTypeOntology.isTypeOf(feature.type, 'transcript') ||
+    featureTypeOntology.isTypeOf(feature.type, 'pseudogenic_transcript')
   const featureID: string | undefined = feature.attributes
     .get('gff_id')
     ?.toString()
@@ -751,7 +757,9 @@ function drawTooltip(
   if (!featureTypeOntology) {
     throw new Error('featureTypeOntology is undefined')
   }
-  const isTranscript = featureTypeOntology.isTypeOf(feature.type, 'transcript')
+  const isTranscript =
+    featureTypeOntology.isTypeOf(feature.type, 'transcript') ||
+    featureTypeOntology.isTypeOf(feature.type, 'pseudogenic_transcript')
   if (!isTranscript) {
     return
   }
@@ -783,7 +791,7 @@ function drawTooltip(
     return
   }
   const { max, min, phase } = cds
-  location += `${min + 1}–${max}`
+  location += `${min + 1}-${max}`
 
   let startPx =
     (lgv.bpToPx({
@@ -856,7 +864,7 @@ function getContextMenuItems(
     session,
   } = display
   const [region] = regions
-  const currentAssemblyId = display.getAssemblyId(region.assemblyName)
+  const currentAssemblyId = display.getAssemblyId(region.assemblyName) as string
   const menuItems: MenuItem[] = []
   const role = internetAccount ? internetAccount.role : 'admin'
   const readOnly = !(role && ['admin', 'user'].includes(role))
@@ -888,7 +896,7 @@ function getContextMenuItems(
       if (isExonFeature(feature, session)) {
         const adjacentExons = getAdjacentExons(feature, display)
         const lgv = getContainingView(
-          display as BaseDisplayModel,
+          display,
         ) as unknown as LinearGenomeViewModel
         if (adjacentExons.upstream) {
           const exon = adjacentExons.upstream
@@ -1009,7 +1017,7 @@ function onMouseLeave(): void {
 export const geneGlyph: Glyph = {
   draw,
   drawDragPreview,
-  drawHover,
+  drawOverlay,
   drawTooltip,
   getContextMenuItems,
   getContextMenuItemsForFeature,

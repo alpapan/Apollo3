@@ -57,14 +57,14 @@ describe('RefSeqsService', () => {
       const mockRefSeqs = [{ _id: 'ref1', assembly: mockAssemblyId }]
 
       mockAssemblyModel.findOne.mockReturnValue({
-        exec: jest.fn().mockResolvedValue({
+        exec: jest.fn<() => Promise<unknown>>().mockResolvedValue({
           _id: mockAssemblyId,
           name: 'volvox',
         }),
       })
 
       mockRefSeqModel.find.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockRefSeqs),
+        exec: jest.fn<() => Promise<unknown>>().mockResolvedValue(mockRefSeqs),
       })
 
       const result = await service.findAll({ assembly: 'volvox' })
@@ -78,7 +78,7 @@ describe('RefSeqsService', () => {
 
     it('should throw NotFoundException when assembly name does not exist', async () => {
       mockAssemblyModel.findOne.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(null),
+        exec: jest.fn<() => Promise<unknown>>().mockResolvedValue(null),
       })
 
       await expect(
@@ -94,7 +94,7 @@ describe('RefSeqsService', () => {
       const mockRefSeqs = [{ _id: 'ref1', assembly: validObjectIdString }]
 
       mockRefSeqModel.find.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockRefSeqs),
+        exec: jest.fn<() => Promise<unknown>>().mockResolvedValue(mockRefSeqs),
       })
 
       const result = await service.findAll({ assembly: validObjectIdString })
@@ -110,7 +110,7 @@ describe('RefSeqsService', () => {
       const mockRefSeqs = [{ _id: 'ref1' }]
 
       mockRefSeqModel.find.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockRefSeqs),
+        exec: jest.fn<() => Promise<unknown>>().mockResolvedValue(mockRefSeqs),
       })
 
       const result = await service.findAll({})
@@ -124,7 +124,7 @@ describe('RefSeqsService', () => {
       const mockRefSeqs = [{ _id: 'ref1' }]
 
       mockRefSeqModel.find.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockRefSeqs),
+        exec: jest.fn<() => Promise<unknown>>().mockResolvedValue(mockRefSeqs),
       })
 
       const result = await service.findAll()

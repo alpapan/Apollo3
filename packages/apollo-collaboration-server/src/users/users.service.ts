@@ -57,6 +57,10 @@ export class UsersService {
     return this.userModel.findOne({ email }).exec()
   }
 
+  async deleteByEmail(email: string) {
+    return this.userModel.findOneAndDelete({ email }).exec()
+  }
+
   async findByRole(role: Role) {
     return this.userModel.findOne({ role }).sort('createdAt').exec()
   }
@@ -83,13 +87,13 @@ export class UsersService {
       .findByIdAndUpdate(
         id,
         { role, lastId1Kid: kid, lastId1BootId: bootId },
-        { new: true },
+        { returnDocument: 'after' },
       )
       .exec()
   }
 
   async getCount() {
-    return this.userModel.count().exec()
+    return this.userModel.countDocuments().exec()
   }
 
   async bootstrapDB() {
@@ -168,7 +172,7 @@ export class UsersService {
       reqType: 'CURRENT_LOCATION',
     }
     this.logger.debug(
-      `*** Broadcasting request to resend users's current locations. Channel "${channel}", the message is "${JSON.stringify(
+      `Broadcasting request to resend users's current locations. Channel "${channel}", the message is "${JSON.stringify(
         msg,
       )}"`,
     )

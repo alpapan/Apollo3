@@ -2,12 +2,12 @@
 
 import type { AnnotationFeature } from '@apollo-annotation/mst'
 import type PluginManager from '@jbrowse/core/PluginManager'
+import type { Assembly } from '@jbrowse/core/assemblyManager/assembly'
 import type { AnyConfigurationSchemaType } from '@jbrowse/core/configuration'
 import { type AbstractSessionModel, doesIntersect2 } from '@jbrowse/core/util'
 import { addDisposer, isAlive } from '@jbrowse/mobx-state-tree'
 import { autorun, observable } from 'mobx'
 
-import type { ApolloSessionModel } from '../../session'
 import {
   isCDSFeature,
   isExonFeature,
@@ -72,7 +72,9 @@ export function layoutsModelFactory(
       getCanonicalRefName(assemblyName: string, refSeq: string) {
         const { assemblyManager } =
           self.session as unknown as AbstractSessionModel
-        const assembly = assemblyManager.get(assemblyName)
+        const assembly = assemblyManager.get(assemblyName) as
+          | Assembly
+          | undefined
         if (!assembly) {
           throw new Error('no assembly in layout')
         }
@@ -298,9 +300,9 @@ export function layoutsModelFactory(
               }
               // Add features that are in the current view
               for (const region of self.regions) {
-                const assembly = (
-                  self.session as unknown as ApolloSessionModel
-                ).apolloDataStore.assemblies.get(region.assemblyName)
+                const assembly = self.session.apolloDataStore.assemblies.get(
+                  region.assemblyName,
+                )
                 const ref = assembly?.getByRefName(region.refName)
                 const features = ref?.features
                 if (!features) {

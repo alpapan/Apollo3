@@ -70,10 +70,7 @@ if (!newVersion) {
   throw new Error('Could not determine next version')
 }
 
-let m: string | undefined = message
-if (m === undefined) {
-  m = `Tag release v${newVersion}`
-}
+const m = message ?? `Tag release v${newVersion}`
 
 exec('yarn', [
   'workspaces',
@@ -84,6 +81,16 @@ exec('yarn', [
   strategy,
 ])
 exec('git', ['add', '--force', 'packages/**/package.json'])
+exec('sed', [
+  '--in-place',
+  '--regexp-extended',
+  String.raw`s/APOLLO_VERSION=[0-9]+\.[0-9]+\.[0-9]+/APOLLO_VERSION=${newVersion}/`,
+  'packages/website/docs/03-multi-user/02-installation/02-examples/01-docker-compose.md',
+])
+exec('git', [
+  'add',
+  'packages/website/docs/03-multi-user/02-installation/02-examples/01-docker-compose.md',
+])
 exec('git', ['commit', '--message', m])
 exec('git', ['tag', '--annotate', `v${newVersion}`, '--message', m])
 exec('git', ['push', '--follow-tags'])
