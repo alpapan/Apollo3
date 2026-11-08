@@ -19,6 +19,7 @@ import {
 import {
   AddFeatureChange,
   type AddFeatureChangeDetails,
+  type AddFeaturesFromFileChange,
   type ChangeMessage,
   type DecodedJWT,
   changes,
@@ -183,6 +184,13 @@ export class ChangesService {
         try {
           await this.batchUpdateMany(this.assemblyModel, uniqUserId)
           await this.batchUpdateMany(this.refSeqChunkModel, uniqUserId)
+          if (change.typeName === 'AddFeaturesFromFileChange') {
+            const { assembly, deleteExistingFeatures } =
+              change as AddFeaturesFromFileChange
+            if (deleteExistingFeatures) {
+              await this.removeSettledFeatures(assembly)
+            }
+          }
           await this.batchUpdateMany(this.featureModel, uniqUserId)
           await this.batchUpdateMany(this.refSeqModel, uniqUserId)
         } catch (error) {
@@ -348,6 +356,21 @@ export class ChangesService {
     }
 
     return { changes, totalCount }
+  }
+
+  /**
+   * Removes the features of an assembly that a file import replaces. Runs after
+   * the import, the change record and post-validation have succeeded, so a
+   * failed change leaves them in place. Features still being imported
+   * (status -1) are kept.
+   */
+  private async removeSettledFeatures(assembly: string) {
+    const refSeqs = await this.refSeqModel.find({ assembly }).exec()
+    for (const refSeq of refSeqs) {
+      await this.featureModel
+        .deleteMany({ refSeq: refSeq._id, status: { $ne: -1 } })
+        .exec()
+    }
   }
 
   async batchUpdateMany(
