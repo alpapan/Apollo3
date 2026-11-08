@@ -113,8 +113,16 @@ export class ChangeManager {
     // post-validate
     const results2 = await validationRegistry.frontendPostValidate(change)
     if (!results2.ok) {
-      // notify of invalid change and revert
-      await this.undo(change)
+      // revert locally and do not send the invalid change to the server; the
+      // change-in-progress flag is released first so the inverse is accepted
+      const msg = `Post-validation failed: "${results2.resultsMessages}"`
+      if (updateJobsManager) {
+        jobsManager.abortJob(job.name, msg)
+      }
+      session.notify(msg, 'error')
+      setChangeInProgress(false)
+      await this.undo(change, false)
+      return
     }
 
     if (submitToBackend) {
@@ -143,7 +151,7 @@ export class ChangeManager {
         return
       }
       if (!backendResult.ok) {
-        const msg = `Post-validation failed: "${result.resultsMessages}"`
+        const msg = `Post-validation failed: "${backendResult.resultsMessages}"`
         if (updateJobsManager) {
           jobsManager.abortJob(job.name, msg)
         }
