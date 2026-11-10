@@ -43,9 +43,15 @@ interface DeleteManyCall {
 /** Stands in for the Mongoose models, the database boundary. */
 async function makeService(feature: StoredFeature) {
   const deleteManyCalls: DeleteManyCall[] = []
+  const deleteByIdSessions: unknown[] = []
   const featureModel = {
     findOne: () => ({ session: () => ({ exec: async () => feature }) }),
-    findByIdAndDelete: async () => feature,
+    findByIdAndDelete: () => ({
+      session: (session: unknown) => {
+        deleteByIdSessions.push(session)
+        return Promise.resolve(feature)
+      },
+    }),
   }
   const checkResultModel = {
     deleteMany: (filter: DeleteManyCall['filter']) => {
@@ -81,6 +87,7 @@ async function makeService(feature: StoredFeature) {
   return {
     service: module.get<ChangeHandlersService>(ChangeHandlersService),
     deleteManyCalls,
+    deleteByIdSessions,
   }
 }
 
@@ -114,10 +121,7 @@ describe('ChangeHandlersService.DeleteFeatureChange', () => {
     }
     const { service, deleteManyCalls } = await makeService(feature)
 
-    await service.DeleteFeatureChange(
-      deleteChange(geneId.toString()),
-      context,
-    )
+    await service.DeleteFeatureChange(deleteChange(geneId.toString()), context)
 
     expect(deleteManyCalls).toEqual([
       {
@@ -125,6 +129,22 @@ describe('ChangeHandlersService.DeleteFeatureChange', () => {
         session: context.session,
       },
     ])
+  })
+
+  it('deletes a top-level document inside the change transaction', async () => {
+    const geneId = new Types.ObjectId()
+    const feature: StoredFeature = {
+      _id: geneId,
+      id: geneId.toString(),
+      allIds: [geneId.toString()],
+      markModified: () => undefined,
+      save: async () => undefined,
+    }
+    const { service, deleteByIdSessions } = await makeService(feature)
+
+    await service.DeleteFeatureChange(deleteChange(geneId.toString()), context)
+
+    expect(deleteByIdSessions).toEqual([context.session])
   })
 
   it('removes the check results of a deleted child and its descendants only', async () => {
