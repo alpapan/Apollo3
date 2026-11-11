@@ -263,7 +263,7 @@ export class ChangeHandlersService implements ChangeHandlers {
             `Feature "${deletedFeature._id}" is top-level, but received a parent feature ID`,
           )
         }
-        await featureModel.findByIdAndDelete(featureDoc._id)
+        await featureModel.findByIdAndDelete(featureDoc._id).session(session)
         await deleteCheckResults(featureDoc.allIds)
         this.logger.debug(
           `Feature "${deletedFeature._id}" deleted from document "${featureDoc.id}". Whole document deleted.`,
