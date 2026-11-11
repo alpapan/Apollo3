@@ -263,7 +263,7 @@ export class ChangeHandlersService implements ChangeHandlers {
             `Feature "${deletedFeature._id}" is top-level, but received a parent feature ID`,
           )
         }
-        await featureModel.findByIdAndDelete(featureDoc._id)
+        await featureModel.findByIdAndDelete(featureDoc._id).session(session)
         await deleteCheckResults(featureDoc.allIds)
         this.logger.debug(
           `Feature "${deletedFeature._id}" deleted from document "${featureDoc.id}". Whole document deleted.`,
@@ -1137,15 +1137,6 @@ export class ChangeHandlersService implements ChangeHandlers {
     }
   }
 
-  private async removeExistingFeatures(assembly: string): Promise<void> {
-    const { featureModel, refSeqModel } = this
-    this.logger.debug(`Removing existing features for assembly = ${assembly}`)
-    const refSeqs = await refSeqModel.find({ assembly }).exec()
-    for (const refSeq of refSeqs) {
-      await featureModel.deleteMany({ refSeq: refSeq._id })
-    }
-  }
-
   private async addFeatureIntoDb(
     gff3Feature: GFF3Feature,
     assembly: string,
@@ -1362,17 +1353,19 @@ export class ChangeHandlersService implements ChangeHandlers {
 
   async ImportJBrowseConfigChange(
     change: ImportJBrowseConfigChange,
-    _context: { session: ClientSession; user: string },
+    context: { session: ClientSession; user: string },
   ) {
     const { jbrowseConfigModel } = this
     const { newJBrowseConfig } = change
-    await jbrowseConfigModel.deleteMany()
+    const { session } = context
+    await jbrowseConfigModel.deleteMany().session(session)
     if (!newJBrowseConfig) {
       return
     }
     const filteredConfig = filterJBrowseConfig(newJBrowseConfig)
     await jbrowseConfigModel.create(
-      filteredConfig as unknown as Record<string, unknown>,
+      [filteredConfig as unknown as Record<string, unknown>],
+      { session },
     )
     this.logger.debug('Stored new JBrowse Config')
   }
@@ -1397,19 +1390,20 @@ export class ChangeHandlersService implements ChangeHandlers {
 
   async AddAssemblyAliasesChange(
     change: AddAssemblyAliasesChange,
-    _context: { session: ClientSession; user: string },
+    context: { session: ClientSession; user: string },
   ) {
     const { assemblyModel } = this
     const { aliases, assembly } = change
+    const { session } = context
     this.logger.debug(
       `Updating assembly aliases for assembly: ${assembly}, aliases: ${JSON.stringify(aliases)}`,
     )
-    const asm = await assemblyModel.findById(assembly)
+    const asm = await assemblyModel.findById(assembly).session(session)
     if (!asm) {
       throw new Error(`Assembly with ID ${assembly} not found`)
     }
     asm.aliases = aliases
-    await asm.save()
+    await asm.save({ session })
   }
 
   async AddAssemblyFromExternalChange(
@@ -1582,11 +1576,8 @@ export class ChangeHandlersService implements ChangeHandlers {
     context: { session: ClientSession; user: string },
   ) {
     const { fileModel, filesService } = this
-    const { assembly, changes, deleteExistingFeatures } = change
+    const { assembly, changes } = change
     const { user } = context
-    if (deleteExistingFeatures) {
-      await this.removeExistingFeatures(assembly)
-    }
     for (const c of changes) {
       const { fileId, parseOptions } = c
       const { FILE_UPLOAD_FOLDER } = process.env
