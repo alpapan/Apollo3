@@ -65,6 +65,29 @@ async function arrayFromAsync<T>(iter: AsyncIterable<T>) {
 //   )
 // }
 
+/**
+ * The tail of the work queued for each database name. Stores of the same
+ * database (name and version) take turns, so the first one loads the ontology
+ * and the others find the finished database instead of loading it again.
+ */
+const databaseQueues = new Map<string, Promise<void>>()
+
+function settled(): void {
+  // a failed load is reported to the store that ran it, not to the next in line
+}
+
+function runInTurn<T>(dbName: string, task: () => Promise<T>): Promise<T> {
+  const result = (databaseQueues.get(dbName) ?? Promise.resolve()).then(task)
+  const tail = result.then(settled, settled)
+  databaseQueues.set(dbName, tail)
+  void tail.then(() => {
+    if (databaseQueues.get(dbName) === tail) {
+      databaseQueues.delete(dbName)
+    }
+  })
+  return result
+}
+
 export interface OntologyStoreOptions {
   prefixes?: Map<string, string>
   textIndexing?: {
@@ -171,6 +194,10 @@ export default class OntologyStore {
       throw errors
     }
 
+    return runInTurn(this.dbName, () => this.openAndLoadDatabase())
+  }
+
+  private async openAndLoadDatabase() {
     const db = await this.openDatabase(this.dbName)
 
     // if database is already completely loaded, just return it
