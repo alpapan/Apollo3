@@ -33,6 +33,57 @@ beforeAll(async () => {
 })
 
 describe('OntologyStore', () => {
+  it('finds the database a load wrote current for a store with the same options', async () => {
+    const db = await so.db
+    expect(await so.isDatabaseCurrent(db)).toBe(true)
+  })
+
+  it('finds the database not current for a store with different prefixes', async () => {
+    const db = await so.db
+    const differentPrefixes = new Map(prefixes)
+    differentPrefixes.set('SO:', 'other-prefix-')
+    const otherStore = { options: { prefixes: differentPrefixes } }
+    expect(
+      await so.isDatabaseCurrent.call(otherStore as OntologyStore, db),
+    ).toBe(false)
+    const missingPrefixes = { options: {} }
+    expect(
+      await so.isDatabaseCurrent.call(missingPrefixes as OntologyStore, db),
+    ).toBe(false)
+  })
+
+  it('finds the database a load wrote current for a store with text indexing options', async () => {
+    const localPath = path.resolve(
+      __dirname,
+      '../../../test_data/goslim_generic.json',
+    )
+    const textIndexing = {
+      indexFields: [{ displayName: 'Label', jsonPath: '$.lbl' }],
+    }
+    const store = new OntologyStore(
+      'Text Indexing Options',
+      'automated testing',
+      { locationType: 'LocalPathLocation', localPath },
+      { prefixes, textIndexing },
+    )
+    const db = await store.db
+    expect(await store.isDatabaseCurrent(db)).toBe(true)
+    const differentTextIndexing = {
+      options: {
+        prefixes,
+        textIndexing: {
+          indexFields: [{ displayName: 'Label', jsonPath: '$.other' }],
+        },
+      },
+    }
+    expect(
+      await store.isDatabaseCurrent.call(
+        differentTextIndexing as OntologyStore,
+        db,
+      ),
+    ).toBe(false)
+  })
+
   it('can load goslim generic', async () => {
     const localPath = path.resolve(
       __dirname,

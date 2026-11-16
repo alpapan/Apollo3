@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 
 import { openLocation } from '@jbrowse/core/util/io'
-import equal from 'fast-deep-equal/es6'
 import {
   type IDBPDatabase,
   type IDBPTransaction,
@@ -206,6 +205,55 @@ export function getTextIndexFields(this: OntologyStore) {
   ]
 }
 
+/**
+ * Compare two prefix maps by their entries. A Map read back from IndexedDB can
+ * come from a different realm than the one in the store options, so its
+ * constructor differs and constructor-sensitive deep equality reports a
+ * mismatch for identical entries.
+ */
+function samePrefixes(
+  a: Map<string, string> | undefined,
+  b: Map<string, string> | undefined,
+) {
+  if (!a || !b) {
+    return !a && !b
+  }
+  if (a.size !== b.size) {
+    return false
+  }
+  for (const [key, value] of a) {
+    if (!b.has(key) || b.get(key) !== value) {
+      return false
+    }
+  }
+  return true
+}
+
+/**
+ * Compare two text indexing options field by field. Constructor-sensitive deep
+ * equality reports a mismatch between options read back from IndexedDB and
+ * identical ones built here when the two come from different realms.
+ */
+function sameTextIndexing(
+  a: OntologyStore['options']['textIndexing'],
+  b: OntologyStore['options']['textIndexing'],
+) {
+  if (!a || !b) {
+    return !a && !b
+  }
+  if (!a.indexFields || !b.indexFields) {
+    return !a.indexFields && !b.indexFields
+  }
+  return (
+    a.indexFields.length === b.indexFields.length &&
+    a.indexFields.every(
+      (field, index) =>
+        field.displayName === b.indexFields?.[index].displayName &&
+        field.jsonPath === b.indexFields[index].jsonPath,
+    )
+  )
+}
+
 export async function isDatabaseCurrent(this: OntologyStore, db: Database) {
   // since metadata is loaded last, we use it as a signal that all the other data
   // was loaded
@@ -215,7 +263,7 @@ export async function isDatabaseCurrent(this: OntologyStore, db: Database) {
   }
   // check that the index paths and prefixes are the same as our current ones
   return (
-    equal(this.options.prefixes, meta.storeOptions.prefixes) &&
-    equal(this.options.textIndexing, meta.storeOptions.textIndexing)
+    samePrefixes(this.options.prefixes, meta.storeOptions.prefixes) &&
+    sameTextIndexing(this.options.textIndexing, meta.storeOptions.textIndexing)
   )
 }
